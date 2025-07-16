@@ -98,6 +98,46 @@ p {
   flex-direction: column;
 }
 
+.flex-1 {
+  flex: 1;
+}
+
+.min-h-screen {
+  min-height: 100vh;
+}
+
+.sticky {
+  position: sticky;
+}
+
+.top-0 {
+  top: 0;
+}
+
+.bottom-0 {
+  bottom: 0;
+}
+
+.z-30 {
+  z-index: 30;
+}
+
+.bg-background {
+  background-color: hsl(var(--background));
+}
+
+.border-b {
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.border-t {
+  border-top: 1px solid hsl(var(--border));
+}
+
+.border-border {
+  border-color: hsl(var(--border));
+}
+
 .items-center {
   align-items: center;
 }
@@ -181,6 +221,10 @@ p {
 
 .mb-6 {
   margin-bottom: 1.5rem;
+}
+
+.p-2 {
+  padding: 0.5rem;
 }
 
 .p-4 {

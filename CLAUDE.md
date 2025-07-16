@@ -29,8 +29,11 @@ python setup_db.py
 # Install dependencies (already done)
 uv add <package-name>
 
-# Run the application
+# Run the application (with auto-reload enabled by default)
 uv run python run.py
+
+# Run the application with explicit reload flag
+uv run python run.py --reload
 
 # Run tests
 uv run python tests/test_basic_flow.py

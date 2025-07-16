@@ -133,5 +133,5 @@ def get_app_config() -> dict:
     return {
         "host": os.getenv("APP_HOST", "0.0.0.0"),
         "port": int(os.getenv("APP_PORT", "8000")),
-        "debug": os.getenv("APP_DEBUG", "false").lower() == "true",
+        "debug": os.getenv("APP_DEBUG", "true").lower() == "true",
     }
