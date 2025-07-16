@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Python project called "memes-ranker" configured with modern Python packaging using pyproject.toml. The project is in its initial stage with minimal code structure.
+This is a fully functional FastAPI-based memes-ranker application with shadcn/ui components, SQLite database, and Docker deployment support. Users can rate memes on a scale of 0-10, with admin dashboard for session management and statistics.
 
 ## Development Setup
 
@@ -29,9 +29,11 @@ python setup_db.py
 # Install dependencies (already done)
 uv add <package-name>
 
-# Run Python scripts
-uv run python hello.py
-uv run python setup_db.py
+# Run the application
+uv run python run.py
+
+# Run tests
+uv run python tests/test_basic_flow.py
 
 # Activate virtual environment
 source .venv/bin/activate
@@ -39,14 +41,32 @@ source .venv/bin/activate
 
 ## Project Structure
 
-- `hello.py` - Entry point with basic main function
-- `pyproject.toml` - Project configuration and metadata
-- `README.md` - Project documentation (currently empty)
+- `run.py` - Application entry point
 - `setup_db.py` - Database initialization script
+- `app/` - Main application code
+  - `main.py` - FastAPI application with routes
+  - `database.py` - Async SQLite database operations
+  - `auth.py` - Admin authentication
+  - `utils.py` - Utility functions (QR code, coolname)
+- `static/` - Static files (CSS, JS, memes)
+- `templates/` - HTML templates
+- `tests/` - Integration tests
 - `sql/schema.sql` - Database schema
-- `app/database.py` - Async SQLite database operations
-- `data/` - Database storage directory (created by setup_db.py)
+- `data/` - Database storage directory
+
+## Quick Start
+
+1. **Initialize Database**: `uv run python setup_db.py`
+1. **Start Application**: `uv run python run.py`
+1. **Open Browser**: http://localhost:8000
+1. **Admin Access**: http://localhost:8000/admin (password: admin123)
 
 ## Architecture Notes
 
-This is a minimal Python project structure. The main application logic is currently in `hello.py` with a simple main function. As the project grows, consider organizing code into proper modules and packages.
+This is a complete FastAPI application with:
+
+- **Frontend**: shadcn/ui components with minimal JavaScript
+- **Backend**: FastAPI with async SQLite database operations
+- **Authentication**: JWT-based admin authentication
+- **Session Management**: Cookie-based user sessions
+- **Testing**: Integration tests for complete game flow

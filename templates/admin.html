@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Memes Ranker{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    {% if not is_dashboard %}
+        <!-- Admin Login Form -->
+        <div class="max-w-md mx-auto">
+            <div class="card">
+                <div class="card-header text-center">
+                    <h2 class="card-title">Admin Login</h2>
+                    <p class="card-description">Enter admin password to access dashboard</p>
+                </div>
+                <div class="card-content">
+                    <form action="/admin/login" method="post">
+                        <div class="form-group">
+                            <label for="password" class="form-label">Password</label>
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                class="input"
+                                required
+                                autocomplete="current-password"
+                            >
+                        </div>
+                        <button type="submit" class="btn btn-primary w-full">
+                            Login
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <!-- Admin Dashboard -->
+        <div class="space-y-6">
+            <!-- Dashboard Header -->
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold">Admin Dashboard</h1>
+                <div class="flex gap-4">
+                    <button id="populate-memes" class="btn btn-secondary">
+                        Populate Memes
+                    </button>
+                    <button id="new-session" class="btn btn-primary">
+                        New Session
+                    </button>
+                </div>
+            </div>
+
+            <!-- QR Code Section -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">QR Code</h2>
+                    <p class="card-description">Share this QR code for users to join</p>
+                </div>
+                <div class="card-content">
+                    <div class="flex items-center gap-6">
+                        <div class="qr-code-container">
+                            <img src="/qr-code" alt="QR Code for users to join" class="mx-auto">
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-sm text-muted-foreground mb-2">
+                                Users can scan this QR code to join the meme ranking session.
+                            </p>
+                            <p class="font-mono text-sm">{{ qr_code_url }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Session Info -->
+            {% if active_session %}
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Active Session</h2>
+                    </div>
+                    <div class="card-content">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-sm text-muted-foreground">Session Name</p>
+                                <p class="font-medium">{{ active_session.name }}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-muted-foreground">Started</p>
+                                <p class="font-medium">{{ active_session.start_time or 'Not started' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Meme Statistics -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Meme Statistics</h2>
+                    <p class="card-description">Rankings and statistics for all memes</p>
+                </div>
+                <div class="card-content">
+                    {% if meme_stats %}
+                        <div class="overflow-x-auto">
+                            <table class="table">
+                                <thead class="table-header">
+                                    <tr class="table-row">
+                                        <th class="table-head">Meme</th>
+                                        <th class="table-head">Average Score</th>
+                                        <th class="table-head">Total Ratings</th>
+                                        <th class="table-head">Score Range</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for stat in meme_stats %}
+                                        <tr class="table-row">
+                                            <td class="table-cell">
+                                                <div class="flex items-center gap-3">
+                                                    <img
+                                                        src="{{ stat.path }}"
+                                                        alt="{{ stat.filename }}"
+                                                        class="w-16 h-16 object-cover rounded"
+                                                    >
+                                                    <div>
+                                                        <p class="font-medium">{{ stat.filename }}</p>
+                                                        <p class="text-sm text-muted-foreground">ID: {{ stat.id }}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="table-cell">
+                                                <div class="flex items-center gap-2">
+                                                    {% if stat.average_score %}
+                                                        <span class="badge badge-default">
+                                                            {{ "%.1f"|format(stat.average_score) }}/10
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="badge badge-outline">No ratings</span>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                            <td class="table-cell">
+                                                <span class="text-sm font-medium">{{ stat.ranking_count }}</span>
+                                            </td>
+                                            <td class="table-cell">
+                                                {% if stat.min_score is not none and stat.max_score is not none %}
+                                                    <span class="text-sm">
+                                                        {{ stat.min_score }} - {{ stat.max_score }}
+                                                    </span>
+                                                {% else %}
+                                                    <span class="text-sm text-muted-foreground">-</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-8">
+                            <p class="text-muted-foreground">No memes found. Click "Populate Memes" to add memes.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- New Session Dialog -->
+<div id="session-dialog" class="dialog-overlay hidden">
+    <div class="dialog-content">
+        <div class="dialog-header">
+            <h3 class="dialog-title">Create New Session</h3>
+            <p class="dialog-description">Start a new ranking session</p>
+        </div>
+        <div class="dialog-body">
+            <form id="session-form">
+                <div class="form-group">
+                    <label for="session-name" class="form-label">Session Name</label>
+                    <input
+                        type="text"
+                        id="session-name"
+                        name="name"
+                        class="input"
+                        placeholder="e.g., Friday Meme Battle"
+                        required
+                    >
+                </div>
+            </form>
+        </div>
+        <div class="dialog-footer">
+            <button type="button" id="cancel-session" class="btn btn-outline">Cancel</button>
+            <button type="submit" form="session-form" class="btn btn-primary">Create Session</button>
+        </div>
+    </div>
+</div>
+
+<!-- Message Container -->
+<div id="message-container" class="fixed top-4 right-4 z-50 max-w-md"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Dialog functionality
+    const sessionDialog = document.getElementById('session-dialog');
+    const newSessionBtn = document.getElementById('new-session');
+    const cancelSessionBtn = document.getElementById('cancel-session');
+    const sessionForm = document.getElementById('session-form');
+    const populateMemesBtn = document.getElementById('populate-memes');
+
+    // Show dialog
+    if (newSessionBtn) {
+        newSessionBtn.addEventListener('click', () => {
+            sessionDialog.classList.remove('hidden');
+        });
+    }
+
+    // Hide dialog
+    if (cancelSessionBtn) {
+        cancelSessionBtn.addEventListener('click', () => {
+            sessionDialog.classList.add('hidden');
+        });
+    }
+
+    // Close dialog on overlay click
+    sessionDialog?.addEventListener('click', (e) => {
+        if (e.target === sessionDialog) {
+            sessionDialog.classList.add('hidden');
+        }
+    });
+
+    // Handle session form submission
+    if (sessionForm) {
+        sessionForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(sessionForm);
+            const sessionName = formData.get('name');
+
+            try {
+                const response = await fetch('/admin/session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: sessionName
+                    })
+                });
+
+                if (response.ok) {
+                    showMessage('Session created successfully!', 'success');
+                    sessionDialog.classList.add('hidden');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    const error = await response.json();
+                    showMessage(error.detail || 'Error creating session', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error. Please try again.', 'error');
+            }
+        });
+    }
+
+    // Populate memes
+    if (populateMemesBtn) {
+        populateMemesBtn.addEventListener('click', async () => {
+            try {
+                populateMemesBtn.disabled = true;
+                populateMemesBtn.textContent = 'Populating...';
+
+                const response = await fetch('/admin/memes/populate', {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showMessage(`${result.memes_added} memes added successfully!`, 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    const error = await response.json();
+                    showMessage(error.detail || 'Error populating memes', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error. Please try again.', 'error');
+            } finally {
+                populateMemesBtn.disabled = false;
+                populateMemesBtn.textContent = 'Populate Memes';
+            }
+        });
+    }
+
+    // Utility functions
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+
+    function showMessage(message, type) {
+        const container = document.getElementById('message-container');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `card p-4 mb-4 ${type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+        messageDiv.textContent = message;
+
+        container.appendChild(messageDiv);
+
+        setTimeout(() => {
+            messageDiv.remove();
+        }, 5000);
+    }
+</script>
+{% endblock %}

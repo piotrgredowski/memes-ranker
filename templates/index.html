@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Memes Ranker - Rate Memes{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto">
+    {% if current_meme %}
+    <!-- Current Meme Section -->
+    <div class="card">
+        <div class="card-header text-center">
+            <h2 class="card-title">Rate This Meme</h2>
+            <p class="card-description">Give it a score from 0 to 10</p>
+        </div>
+        <div class="card-content">
+            <div class="meme-container">
+                <img src="{{ current_meme.path }}" alt="Meme: {{ current_meme.filename }}" class="meme-image"
+                    loading="lazy">
+            </div>
+
+            <div class="rating-section">
+                <div class="rating-display" id="rating-display">5</div>
+                <div class="form-group">
+                    <label for="rating-slider" class="form-label sr-only">Rating (0-10)</label>
+                    <input type="range" id="rating-slider" min="0" max="10" value="5" class="slider w-full"
+                        aria-label="Rate this meme from 0 to 10">
+                    <div class="flex justify-between text-sm text-muted-foreground mt-2">
+                        <span>0 - Terrible</span>
+                        <span>10 - Hilarious</span>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 justify-center mt-6">
+                    <button id="submit-rating" class="btn btn-primary" data-meme-id="{{ current_meme.id }}">
+                        Submit Rating
+                    </button>
+                    <button id="skip-meme" class="btn btn-outline">
+                        Skip
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <!-- No More Memes Section -->
+    <div class="card text-center">
+        <div class="card-content">
+            <h2 class="text-lg font-semibold mb-4">🎉 All Done!</h2>
+            <p class="text-muted-foreground mb-6">
+                You've rated all available memes. Great job!
+            </p>
+
+            {% if user_rankings %}
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Your Ratings</h3>
+                </div>
+                <div class="card-content">
+                    <div class="grid gap-4">
+                        {% for ranking in user_rankings %}
+                        <div class="flex items-center justify-between p-3 border rounded">
+                            <div class="flex items-center gap-3">
+                                <img src="{{ ranking.path }}" alt="{{ ranking.filename }}"
+                                    class="w-12 h-12 object-cover rounded">
+                                <span class="text-sm font-medium">{{ ranking.filename }}</span>
+                            </div>
+                            <span class="badge badge-default">{{ ranking.score }}/10</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Progress Section -->
+    {% if memes %}
+    <div class="card mt-6">
+        <div class="card-content">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-sm font-medium">Progress</span>
+                <span class="text-sm text-muted-foreground">
+                    {{ user_rankings|length if user_rankings else 0 }} / {{ memes|length }}
+                </span>
+            </div>
+            <div class="progress">
+                <div class="progress-indicator"
+                    style="transform: translateX(-{{ 100 - ((user_rankings|length if user_rankings else 0) / memes|length * 100)|round }}%)">
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Success/Error Messages -->
+<div id="message-container" class="fixed top-4 right-4 z-50 max-w-md"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Rating slider functionality
+    const slider = document.getElementById('rating-slider');
+    const display = document.getElementById('rating-display');
+    const submitButton = document.getElementById('submit-rating');
+    const skipButton = document.getElementById('skip-meme');
+
+    if (slider && display) {
+        slider.addEventListener('input', (e) => {
+            display.textContent = e.target.value;
+        });
+    }
+
+    // Submit rating
+    if (submitButton) {
+        submitButton.addEventListener('click', async () => {
+            const memeId = submitButton.dataset.memeId;
+            const score = parseInt(slider.value);
+
+            try {
+                submitButton.disabled = true;
+                submitButton.textContent = 'Submitting...';
+
+                const response = await fetch('/rank', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        meme_id: parseInt(memeId),
+                        score: score
+                    })
+                });
+
+                if (response.ok) {
+                    showMessage('Rating submitted successfully!', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    const error = await response.json();
+                    showMessage(error.detail || 'Error submitting rating', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error. Please try again.', 'error');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Submit Rating';
+            }
+        });
+    }
+
+    // Skip meme (give it a score of 0)
+    if (skipButton) {
+        skipButton.addEventListener('click', () => {
+            slider.value = 0;
+            display.textContent = '0';
+            submitButton.click();
+        });
+    }
+
+    // Message display function
+    function showMessage(message, type) {
+        const container = document.getElementById('message-container');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `card p-4 mb-4 ${type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+        messageDiv.textContent = message;
+
+        container.appendChild(messageDiv);
+
+        setTimeout(() => {
+            messageDiv.remove();
+        }, 5000);
+    }
+</script>
+{% endblock %}

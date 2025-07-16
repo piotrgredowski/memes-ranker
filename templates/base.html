@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Memes Ranker{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/globals.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/components.css') }}">
+    <meta name="description" content="Rate and rank memes with friends">
+    <meta name="robots" content="noindex, nofollow">
+</head>
+
+<body>
+    <div class="container">
+        <header class="py-4">
+            <nav class="flex justify-between items-center">
+                <h1 class="text-lg font-semibold">
+                    <a href="/" class="text-decoration-none">🎭 Memes Ranker</a>
+                </h1>
+                <div class="flex gap-4 items-center">
+                    {% if user_name %}
+                    <span class="text-sm text-muted-foreground">Hello {{ user_name }}!</span>
+                    {% endif %}
+                    <a href="/admin" class="btn btn-outline btn-sm">Admin</a>
+                </div>
+            </nav>
+        </header>
+
+        <main class="py-6">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="py-4 text-center text-sm text-muted-foreground">
+            <p>&copy; 2025 Memes Ranker by <a href="https://github.com/piotrgredowski">@piotrgredowski</a>. Rate
+                responsibly! 🎯
+            </p>
+        </footer>
+    </div>
+
+    <!-- QR Code Widget -->
+    <div id="qr-widget" class="qr-widget">
+        <button class="qr-widget-toggle" type="button" aria-label="Show QR code">
+            QR
+        </button>
+        <div class="qr-widget-panel">
+            <button class="qr-widget-close" type="button" aria-label="Close QR code">
+                ×
+            </button>
+            <h3 id="qr-widget-title">Scan to Share</h3>
+            <p id="qr-widget-description">Scan this QR code to share this meme ranking game with friends!</p>
+            <img src="/qr-code" alt="QR Code for {{ qr_code_url or 'https://memes.bieda.it' }}" loading="lazy" />
+            <p class="text-sm text-muted-foreground mt-2">
+                Scan to join: <span class="font-medium">{{ qr_code_url }}</span>
+            </p>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', path='/js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>
