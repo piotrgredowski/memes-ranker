@@ -143,7 +143,7 @@ CREATE TABLE sessions (
 ## Implementation Steps
 
 1. Set up project structure and dependencies
-1. Create database schema and connection management
+1. Create database schema and connection management ✅
 1. Set up shadcn/ui CSS framework and components
 1. Implement FastAPI routes with plain SQL queries
 1. Build HTML templates with shadcn/ui components
@@ -153,6 +153,34 @@ CREATE TABLE sessions (
 1. Add Docker configuration
 1. Test with load simulation and accessibility
 1. Deploy and monitor
+
+## Database Setup
+
+### Files Created
+
+- `sql/schema.sql` - Database schema with tables for users, memes, rankings, and sessions
+- `setup_db.py` - Database initialization script
+- `app/database.py` - Async SQLite database operations using aiosqlite
+
+### Database Setup Commands
+
+```bash
+# Initialize database (run once)
+python setup_db.py
+
+# The database will be created at: data/memes.db
+# Schema includes proper indexes for performance
+# WAL mode enabled for better concurrency
+```
+
+### Database Features
+
+- **Async Operations**: Uses aiosqlite for non-blocking database operations
+- **Connection Management**: Proper connection handling with context managers
+- **WAL Mode**: Write-Ahead Logging for better concurrency (supports up to 2000 users)
+- **Foreign Key Constraints**: Ensures data integrity
+- **Proper Indexing**: Optimized for common queries
+- **UPSERT Support**: Rankings can be updated if user re-rates a meme
 
 ## shadcn/ui Components Used
 

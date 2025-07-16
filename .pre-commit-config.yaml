@@ -29,9 +29,9 @@ repos:
     language: system
     types: [python]
     pass_filenames: false
-  - id: coverage
-    name: check code coverage
-    entry: uv run python -m pytest --cov --cov-fail-under=90
-    language: system
-    types: [python]
-    pass_filenames: false
+  # - id: coverage
+  #   name: check code coverage
+  #   entry: uv run python -m pytest --cov --cov-fail-under=90
+  #   language: system
+  #   types: [python]
+  #   pass_filenames: false

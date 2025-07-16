@@ -9,19 +9,32 @@ This is a Python project called "memes-ranker" configured with modern Python pac
 ## Development Setup
 
 - **Python Version**: Requires Python >=3.13.0
-- **Package Manager**: Uses standard Python packaging with pyproject.toml
-- **Current Dependencies**: None specified yet
+- **Package Manager**: Uses uv for fast dependency management
+- **Dependencies**: All project dependencies installed via uv
 
 ## Common Commands
 
-Since this is a new project without build tools configured yet, standard Python commands apply:
+### Database Setup
 
 ```bash
-# Run the main module
-python hello.py
+# Initialize database (run once before first use)
+python setup_db.py
 
-# Install in development mode (when dependencies are added)
-pip install -e .
+# The database will be created at: data/memes.db
+```
+
+### Development Commands
+
+```bash
+# Install dependencies (already done)
+uv add <package-name>
+
+# Run Python scripts
+uv run python hello.py
+uv run python setup_db.py
+
+# Activate virtual environment
+source .venv/bin/activate
 ```
 
 ## Project Structure
@@ -29,6 +42,10 @@ pip install -e .
 - `hello.py` - Entry point with basic main function
 - `pyproject.toml` - Project configuration and metadata
 - `README.md` - Project documentation (currently empty)
+- `setup_db.py` - Database initialization script
+- `sql/schema.sql` - Database schema
+- `app/database.py` - Async SQLite database operations
+- `data/` - Database storage directory (created by setup_db.py)
 
 ## Architecture Notes
 
