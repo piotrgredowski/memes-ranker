@@ -214,6 +214,18 @@ async def create_session(
     return {"status": "success", "session_id": session_id}
 
 
+@app.post("/admin/session/finish")
+async def finish_session(admin: dict = Depends(get_current_admin)):
+    """Finish the current active session."""
+    active_session = await db.get_active_session()
+
+    if not active_session:
+        raise HTTPException(status_code=404, detail="No active session found")
+
+    await db.end_session(active_session["id"])
+    return {"status": "success", "message": "Session finished successfully"}
+
+
 @app.post("/admin/memes/populate")
 async def populate_memes(admin: dict = Depends(get_current_admin)):
     """Populate memes from files in static/memes directory."""
