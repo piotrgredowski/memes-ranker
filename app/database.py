@@ -232,6 +232,33 @@ class Database:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
 
+    async def get_user_rankings_for_session(
+        self, user_id: int, session_id: int
+    ) -> List[Dict[str, Any]]:
+        """Get all rankings for a user within a specific session.
+
+        Args:
+            user_id: User ID
+            session_id: Session ID
+
+        Returns:
+            List of ranking data dicts from the current session only
+        """
+        async with self.get_connection() as conn:
+            cursor = await conn.execute(
+                """SELECT r.*, m.filename, m.path
+                   FROM rankings r
+                   JOIN memes m ON r.meme_id = m.id
+                   JOIN sessions s ON s.id = ?
+                   WHERE r.user_id = ?
+                   AND s.start_time IS NOT NULL
+                   AND r.created_at >= s.start_time
+                   ORDER BY r.created_at""",
+                (session_id, user_id),
+            )
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
     async def get_meme_rankings(self, meme_id: int) -> List[Dict[str, Any]]:
         """Get all rankings for a meme.
 
@@ -464,10 +491,22 @@ class Database:
             meme_result = await meme_cursor.fetchone()
             meme_count = meme_result[0] if meme_result else 0
 
+            # Get total unique users who have participated in this session
+            unique_users_count = 0
+            if session.get("start_time"):
+                users_cursor = await conn.execute(
+                    """SELECT COUNT(DISTINCT r.user_id) FROM rankings r
+                       WHERE r.created_at >= ?""",
+                    (session["start_time"],),
+                )
+                users_result = await users_cursor.fetchone()
+                unique_users_count = users_result[0] if users_result else 0
+
             return {
                 "session": session,
                 "vote_count": vote_count,
                 "meme_count": meme_count,
+                "unique_users_count": unique_users_count,
             }
 
 

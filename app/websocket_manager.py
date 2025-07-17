@@ -149,15 +149,21 @@ class WebSocketManager:
 
         # Get vote stats from database
         try:
-            # Get total vote count
-            total_votes = await db.get_total_vote_count()
+            # Get active session and its stats
+            active_session = await db.get_active_session()
+            if not active_session:
+                return
 
-            # Get meme count for expected votes calculation
-            meme_stats = await db.get_meme_stats()
-            meme_count = len(meme_stats) if meme_stats else 0
+            session_stats = await db.get_session_stats(active_session["id"])
+            total_votes = session_stats.get("vote_count", 0)
+            meme_count = session_stats.get("meme_count", 0)
 
-            # Calculate expected votes (users × memes)
-            expected_votes = stats["user_connections"] * meme_count
+            # Calculate expected votes (effective users × memes)
+            # Use the higher of currently connected users or users who have already participated
+            effective_users = max(
+                stats["user_connections"], session_stats.get("unique_users_count", 0)
+            )
+            expected_votes = effective_users * meme_count
 
             # Combine stats
             combined_stats = {

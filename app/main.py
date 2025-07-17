@@ -186,8 +186,10 @@ async def index(request: Request):
     # Get active memes
     memes = await db.get_active_memes()
 
-    # Get user's rankings to find next unranked meme
-    user_rankings = await db.get_user_rankings(user["id"])
+    # Get user's rankings from current session only
+    user_rankings = await db.get_user_rankings_for_session(
+        user["id"], active_session["id"]
+    )
     ranked_meme_ids = {r["meme_id"] for r in user_rankings}
 
     # Find next meme to rank
@@ -384,10 +386,12 @@ async def get_session_stats(admin: dict = Depends(get_current_admin)):
     # Get real-time connection stats from WebSocket manager
     connection_stats = websocket_manager.get_connection_stats()
 
-    # Calculate expected votes (connected users × memes)
-    expected_votes = connection_stats["user_connections"] * session_stats.get(
-        "meme_count", 0
+    # Calculate expected votes (unique participating users × memes)
+    # Use the higher of currently connected users or users who have already participated
+    effective_users = max(
+        connection_stats["user_connections"], session_stats.get("unique_users_count", 0)
     )
+    expected_votes = effective_users * session_stats.get("meme_count", 0)
 
     return {
         "session": session_stats.get("session", {}),
