@@ -1,44 +1,36 @@
-# Production FastAPI application with built-in virtual environment
-FROM ghcr.io/astral-sh/uv:debian-slim
+# Production FastAPI application following uv Docker best practices
+FROM ghcr.io/astral-sh/uv:python3.13-debian-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
-# Install system dependencies including Python
-RUN apt-get update && apt-get install -y \
-    curl \
-    build-essential \
-    python3 \
-    python3-dev \
-    python3-venv \
-    && rm -rf /var/lib/apt/lists/*
-
-
 # Set working directory
 WORKDIR /app
 
-# Copy dependency files
-COPY requirements.txt ./
+# Change ownership of the app directory to appuser
+RUN chown -R appuser:appuser /app
 
-# Create virtual environment and install dependencies
-# Use system Python instead of uv's managed Python
-ENV UV_PYTHON=/usr/bin/python3
-RUN uv venv .venv --python /usr/bin/python3 && \
-    uv pip install --no-cache -r requirements.txt
+# Install dependencies into the system Python
+COPY requirements.txt .
+RUN uv pip install --system --no-cache -r requirements.txt
 
 # Copy application code
-COPY . .
+COPY --chown=appuser:appuser . .
 
 # Make entrypoint script executable
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Create necessary directories
-RUN mkdir -p data logs static/memes static/js static/css templates && \
-    chown -R appuser:appuser /app && \
-    chmod -R 755 /app/.venv
+RUN mkdir -p data logs static/memes static/js static/css templates
 
-# Don't switch to non-root user yet - entrypoint script will handle it
-# USER appuser
+# Switch to non-root user
+USER appuser
 
 # Expose port
 EXPOSE 8000
