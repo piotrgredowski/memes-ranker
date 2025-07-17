@@ -1,5 +1,5 @@
 # Production FastAPI application with built-in virtual environment
-FROM python:3.13-slim
+FROM ghcr.io/astral-sh/uv:debian-slim
 
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
@@ -10,8 +10,6 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv
-RUN pip install --no-cache-dir uv
 
 # Set working directory
 WORKDIR /app
@@ -31,7 +29,8 @@ RUN chmod +x /app/docker-entrypoint.sh
 
 # Create necessary directories
 RUN mkdir -p data logs static/memes static/js static/css templates && \
-    chown -R appuser:appuser /app
+    chown -R appuser:appuser /app && \
+    chmod -R 755 /app/.venv
 
 # Don't switch to non-root user yet - entrypoint script will handle it
 # USER appuser

@@ -14,6 +14,10 @@ mkdir -p /home/appuser/.cache/uv
 chown -R appuser:appuser /home/appuser/.cache
 chmod 755 /home/appuser/.cache
 
+# Fix permissions on virtual environment
+chown -R appuser:appuser /app/.venv
+chmod -R 755 /app/.venv
+
 # Initialize database if needed as appuser
 echo "Checking database initialization..."
 runuser -u appuser -- /app/.venv/bin/python /app/init_db_prod.py
