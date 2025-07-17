@@ -239,6 +239,9 @@ async def rank_meme(request: Request, ranking: RankingRequest):
     # Create/update ranking
     await db.create_ranking(user["id"], ranking.meme_id, ranking.score)
 
+    # Broadcast updated stats to admin dashboard
+    await websocket_manager.broadcast_connection_stats()
+
     return {"status": "success", "message": "Ranking submitted"}
 
 
@@ -286,6 +289,9 @@ async def admin_dashboard(request: Request, admin: dict = Depends(get_current_ad
     if active_session:
         session_stats = await db.get_session_stats(active_session["id"])
 
+    # Get completed sessions for results publishing
+    completed_sessions = await db.get_completed_sessions_with_results()
+
     return templates.TemplateResponse(
         "admin.html",
         {
@@ -294,6 +300,7 @@ async def admin_dashboard(request: Request, admin: dict = Depends(get_current_ad
             "meme_stats": meme_stats,
             "active_session": active_session,
             "session_stats": session_stats,
+            "completed_sessions": completed_sessions,
             "qr_code_url": os.getenv("QR_CODE_URL", "https://memes.bieda.it"),
         },
     )
@@ -392,8 +399,7 @@ async def admin_results_page(
     """Admin results reveal interface."""
     try:
         # Get session and results
-        session_cursor = await db.get_connection()
-        async with session_cursor as conn:
+        async with db.get_connection() as conn:
             cursor = await conn.execute(
                 "SELECT * FROM sessions WHERE id = ?", (session_id,)
             )
@@ -514,8 +520,7 @@ async def public_results_view(session_id: int, request: Request):
     """Public/User view of revealed results - accessible to all users."""
     try:
         # Get session and results
-        session_cursor = await db.get_connection()
-        async with session_cursor as conn:
+        async with db.get_connection() as conn:
             cursor = await conn.execute(
                 "SELECT * FROM sessions WHERE id = ?", (session_id,)
             )

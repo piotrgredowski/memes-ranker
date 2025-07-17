@@ -165,24 +165,34 @@ class Database:
             await conn.commit()
 
     # Ranking operations
-    async def create_ranking(self, user_id: int, meme_id: int, score: int) -> int:
+    async def create_ranking(
+        self, user_id: int, meme_id: int, score: int, session_id: int = None
+    ) -> int:
         """Create or update a ranking.
 
         Args:
             user_id: User ID
             meme_id: Meme ID
             score: Score (0-10)
+            session_id: Session ID (if None, uses active session)
 
         Returns:
             Ranking ID
         """
+        # Get active session if not provided
+        if session_id is None:
+            active_session = await self.get_active_session()
+            if not active_session:
+                raise ValueError("No active session found")
+            session_id = active_session["id"]
+
         async with self.get_connection() as conn:
             cursor = await conn.execute(
-                """INSERT INTO rankings (user_id, meme_id, score)
-                   VALUES (?, ?, ?)
-                   ON CONFLICT(user_id, meme_id)
+                """INSERT INTO rankings (user_id, meme_id, score, session_id)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT(user_id, meme_id, session_id)
                    DO UPDATE SET score = excluded.score, created_at = CURRENT_TIMESTAMP""",
-                (user_id, meme_id, score),
+                (user_id, meme_id, score, session_id),
             )
             await conn.commit()
             ranking_id = cursor.lastrowid
@@ -249,12 +259,9 @@ class Database:
                 """SELECT r.*, m.filename, m.path
                    FROM rankings r
                    JOIN memes m ON r.meme_id = m.id
-                   JOIN sessions s ON s.id = ?
-                   WHERE r.user_id = ?
-                   AND s.start_time IS NOT NULL
-                   AND r.created_at >= s.start_time
+                   WHERE r.user_id = ? AND r.session_id = ?
                    ORDER BY r.created_at""",
-                (session_id, user_id),
+                (user_id, session_id),
             )
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
@@ -473,16 +480,14 @@ class Database:
 
             session = dict(session_row)
 
-            # Count votes submitted during this session (if it has started)
-            vote_count = 0
-            if session.get("start_time"):
-                vote_cursor = await conn.execute(
-                    """SELECT COUNT(*) FROM rankings r
-                       WHERE r.created_at >= ?""",
-                    (session["start_time"],),
-                )
-                vote_result = await vote_cursor.fetchone()
-                vote_count = vote_result[0] if vote_result else 0
+            # Count votes submitted during this session
+            vote_cursor = await conn.execute(
+                """SELECT COUNT(*) FROM rankings r
+                   WHERE r.session_id = ?""",
+                (session_id,),
+            )
+            vote_result = await vote_cursor.fetchone()
+            vote_count = vote_result[0] if vote_result else 0
 
             # Get total number of active memes for expected votes calculation
             meme_cursor = await conn.execute(
@@ -492,15 +497,13 @@ class Database:
             meme_count = meme_result[0] if meme_result else 0
 
             # Get total unique users who have participated in this session
-            unique_users_count = 0
-            if session.get("start_time"):
-                users_cursor = await conn.execute(
-                    """SELECT COUNT(DISTINCT r.user_id) FROM rankings r
-                       WHERE r.created_at >= ?""",
-                    (session["start_time"],),
-                )
-                users_result = await users_cursor.fetchone()
-                unique_users_count = users_result[0] if users_result else 0
+            users_cursor = await conn.execute(
+                """SELECT COUNT(DISTINCT r.user_id) FROM rankings r
+                   WHERE r.session_id = ?""",
+                (session_id,),
+            )
+            users_result = await users_cursor.fetchone()
+            unique_users_count = users_result[0] if users_result else 0
 
             return {
                 "session": session,
@@ -536,10 +539,8 @@ class Database:
                         INSTR(GROUP_CONCAT(r.score ORDER BY r.score), ',') - 1
                     ) AS REAL) as median_score
                 FROM memes m
-                LEFT JOIN rankings r ON m.id = r.meme_id
-                JOIN sessions s ON s.id = ?
+                LEFT JOIN rankings r ON m.id = r.meme_id AND r.session_id = ?
                 WHERE m.active = TRUE
-                AND (s.start_time IS NULL OR r.created_at >= s.start_time)
                 GROUP BY m.id
                 HAVING COUNT(r.id) > 0
                 ORDER BY average_score DESC""",
@@ -639,10 +640,8 @@ class Database:
                     MAX(r.score) as max_score,
                     GROUP_CONCAT(r.score ORDER BY r.score) as all_scores
                 FROM memes m
-                LEFT JOIN rankings r ON m.id = r.meme_id
-                JOIN sessions s ON s.id = ?
+                LEFT JOIN rankings r ON m.id = r.meme_id AND r.session_id = ?
                 WHERE m.id = ? AND m.active = TRUE
-                AND (s.start_time IS NULL OR r.created_at >= s.start_time)
                 GROUP BY m.id""",
                 (session_id, meme_id),
             )
@@ -700,7 +699,7 @@ class Database:
                 WHERE s.active = FALSE AND s.end_time IS NOT NULL
                 AND EXISTS (
                     SELECT 1 FROM rankings r2
-                    WHERE r2.created_at >= s.start_time
+                    WHERE r2.session_id = s.id
                 )
                 GROUP BY s.id
                 ORDER BY s.end_time DESC""",

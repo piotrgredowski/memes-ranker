@@ -42,6 +42,11 @@ async def test_database_operations():
     meme_id = await db.create_meme("test-meme.png", "/static/memes/test-meme.png")
     print(f"✓ Created meme (ID: {meme_id})")
 
+    # Test session creation and activation
+    session_id = await db.create_session("Test Session")
+    await db.start_session(session_id)
+    print(f"✓ Created and started session (ID: {session_id})")
+
     # Test ranking creation
     ranking_id = await db.create_ranking(user_id, meme_id, 8)
     print(f"✓ Created ranking (ID: {ranking_id})")
@@ -135,6 +140,11 @@ async def test_game_simulation():
         memes.append({"id": meme_id, "filename": filename})
 
     print(f"✓ Created {len(memes)} memes")
+
+    # Create and start a session for the game
+    session_id = await db.create_session("Game Session")
+    await db.start_session(session_id)
+    print(f"✓ Created and started session (ID: {session_id})")
 
     # Each user rates each meme
     import random

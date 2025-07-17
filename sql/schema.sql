@@ -22,6 +22,7 @@ CREATE TABLE rankings (
     id INTEGER PRIMARY KEY AUTOINCREMENT
     ,user_id INTEGER NOT NULL
     ,meme_id INTEGER NOT NULL
+    ,session_id INTEGER NOT NULL
     ,score INTEGER NOT NULL CHECK (
         score >= 0
         AND score <= 10
@@ -29,9 +30,11 @@ CREATE TABLE rankings (
     ,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ,FOREIGN KEY (user_id) REFERENCES users(id)
     ,FOREIGN KEY (meme_id) REFERENCES memes(id)
+    ,FOREIGN KEY (session_id) REFERENCES sessions(id)
     ,UNIQUE (
         user_id
         ,meme_id
+        ,session_id
         )
     );
 
@@ -62,6 +65,8 @@ CREATE INDEX idx_users_session_token ON users (session_token);
 CREATE INDEX idx_rankings_user_id ON rankings (user_id);
 
 CREATE INDEX idx_rankings_meme_id ON rankings (meme_id);
+
+CREATE INDEX idx_rankings_session_id ON rankings (session_id);
 
 CREATE INDEX idx_memes_active ON memes (active);
 

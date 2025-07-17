@@ -486,6 +486,37 @@
     background: linear-gradient(to right, #ef4444, #f59e0b, #10b981);
     border: none;
 }
+
+/* Disabled state for rating controls */
+.slider-enhanced:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.slider-enhanced:disabled::-webkit-slider-thumb {
+    cursor: not-allowed;
+    background: #9ca3af;
+    transform: none;
+}
+
+.slider-enhanced:disabled::-moz-range-thumb {
+    cursor: not-allowed;
+    background: #9ca3af;
+}
+
+/* Spinning animation */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
 </style>
 <script>
     // Rating slider functionality
@@ -496,7 +527,10 @@
 
     if (slider && display) {
         slider.addEventListener('input', (e) => {
-            display.textContent = e.target.value;
+            // Only update display if slider is not disabled
+            if (!slider.disabled) {
+                display.textContent = e.target.value;
+            }
         });
     }
 
@@ -507,8 +541,8 @@
             const score = parseInt(slider.value);
 
             try {
-                submitButton.disabled = true;
-                submitButton.textContent = 'Submitting...';
+                // Disable all rating controls immediately
+                disableRatingControls();
 
                 const response = await fetch('/rank', {
                     method: 'POST',
@@ -522,19 +556,21 @@
                 });
 
                 if (response.ok) {
-                    showMessage('Rating submitted successfully!', 'success');
+                    showMessage('Rating submitted successfully! Loading next meme...', 'success');
+                    // Keep controls disabled and wait for next meme to load
                     setTimeout(() => {
                         window.location.reload();
-                    }, 1000);
+                    }, 1500);
                 } else {
                     const error = await response.json();
                     showMessage(error.detail || 'Error submitting rating', 'error');
+                    // Re-enable controls on error
+                    enableRatingControls();
                 }
             } catch (error) {
                 showMessage('Network error. Please try again.', 'error');
-            } finally {
-                submitButton.disabled = false;
-                submitButton.textContent = 'Submit Rating';
+                // Re-enable controls on error
+                enableRatingControls();
             }
         });
     }
@@ -546,6 +582,63 @@
             display.textContent = '0';
             submitButton.click();
         });
+    }
+
+    // Functions to control rating interface state
+    function disableRatingControls() {
+        if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.innerHTML = `
+                <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.3"></circle>
+                    <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"></path>
+                </svg>
+                Processing...
+            `;
+        }
+
+        if (skipButton) {
+            skipButton.disabled = true;
+            skipButton.innerHTML = `
+                <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.3"></circle>
+                    <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"></path>
+                </svg>
+                Processing...
+            `;
+        }
+
+        if (slider) {
+            slider.disabled = true;
+            slider.style.opacity = '0.5';
+        }
+    }
+
+    function enableRatingControls() {
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = `
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                Submit Rating
+            `;
+        }
+
+        if (skipButton) {
+            skipButton.disabled = false;
+            skipButton.innerHTML = `
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Skip
+            `;
+        }
+
+        if (slider) {
+            slider.disabled = false;
+            slider.style.opacity = '1';
+        }
     }
 
     // WebSocket for session updates (when waiting for session)
@@ -647,6 +740,10 @@
     // Message display function
     function showMessage(message, type) {
         const container = document.getElementById('message-container');
+
+        // Clear existing messages to prevent stacking
+        container.innerHTML = '';
+
         const messageDiv = document.createElement('div');
         messageDiv.className = `card p-4 mb-4 ${type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
         messageDiv.textContent = message;
