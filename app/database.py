@@ -47,12 +47,19 @@ class Database:
 
     @asynccontextmanager
     async def get_connection(self):
-        """Get database connection with proper setup."""
+        """Get database connection with proper setup and optimization."""
         async with aiosqlite.connect(self.db_path) as conn:
             # Enable WAL mode for better concurrency
             await conn.execute("PRAGMA journal_mode=WAL")
             # Enable foreign key constraints
             await conn.execute("PRAGMA foreign_keys=ON")
+            # Optimize SQLite for concurrent access
+            await conn.execute("PRAGMA synchronous=NORMAL")
+            await conn.execute("PRAGMA cache_size=10000")
+            await conn.execute("PRAGMA temp_store=memory")
+            await conn.execute("PRAGMA mmap_size=268435456")  # 256MB
+            # Set busy timeout for better concurrency
+            await conn.execute("PRAGMA busy_timeout=30000")  # 30 seconds
             # Set row factory for dict-like access
             conn.row_factory = aiosqlite.Row
             yield conn
