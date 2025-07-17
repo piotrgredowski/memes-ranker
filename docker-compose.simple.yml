@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  # FastAPI application
+  app:
+    build: .
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./static/memes:/app/static/memes
+    environment:
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8000
+      - APP_DEBUG=false
+      - DATABASE_PATH=/app/data/memes.db
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-fallback_secret_key_change_in_production}
+      - QR_CODE_URL=${QR_CODE_URL:-http://localhost:8000}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/session/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

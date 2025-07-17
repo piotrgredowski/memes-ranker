@@ -414,7 +414,7 @@ async def admin_results_page(
         reveal_status = await db.get_reveal_status(session_id)
 
         # If no reveal status exists, initialize it
-        if not reveal_status:
+        if reveal_status is None:
             await db.create_results_reveal(session_id)
             reveal_status = await db.get_reveal_status(session_id)
 
@@ -443,7 +443,9 @@ async def reveal_next_position(
         results = await db.get_session_results(session_id)
         reveal_status = await db.get_reveal_status(session_id)
 
-        current_position = reveal_status.get("current_position", 0)
+        current_position = (
+            reveal_status.get("current_position", 0) if reveal_status else 0
+        )
         max_position = len(results)
 
         if current_position >= max_position:
@@ -492,7 +494,9 @@ async def reveal_previous_position(
     """Go back to previous position."""
     try:
         reveal_status = await db.get_reveal_status(session_id)
-        current_position = reveal_status.get("current_position", 0)
+        current_position = (
+            reveal_status.get("current_position", 0) if reveal_status else 0
+        )
 
         if current_position <= 0:
             raise HTTPException(status_code=400, detail="Already at first position")
@@ -538,6 +542,11 @@ async def public_results_view(session_id: int, request: Request):
 
         results = await db.get_session_results(session_id)
         reveal_status = await db.get_reveal_status(session_id)
+
+        # If no reveal status exists, initialize it
+        if reveal_status is None:
+            await db.create_results_reveal(session_id)
+            reveal_status = await db.get_reveal_status(session_id)
 
         # Get user's rankings for this session if they have a session token
         user_rankings = []

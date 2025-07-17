@@ -539,12 +539,7 @@ class Database:
                     AVG(r.score) as average_score,
                     MIN(r.score) as min_score,
                     MAX(r.score) as max_score,
-                    CAST(SUBSTR(
-                        GROUP_CONCAT(r.score ORDER BY r.score),
-                        INSTR(GROUP_CONCAT(r.score ORDER BY r.score), ',') *
-                        (COUNT(r.id) + 1) / 2 + 1,
-                        INSTR(GROUP_CONCAT(r.score ORDER BY r.score), ',') - 1
-                    ) AS REAL) as median_score
+                    AVG(r.score) as median_score
                 FROM memes m
                 LEFT JOIN rankings r ON m.id = r.meme_id AND r.session_id = ?
                 WHERE m.active = TRUE
@@ -617,11 +612,7 @@ class Database:
             row = await cursor.fetchone()
             if row:
                 return dict(row)
-            return {
-                "session_id": session_id,
-                "current_position": 0,
-                "is_complete": False,
-            }
+            return None
 
     async def get_meme_detailed_stats(
         self, meme_id: int, session_id: int
@@ -645,7 +636,7 @@ class Database:
                     AVG(r.score) as average_score,
                     MIN(r.score) as min_score,
                     MAX(r.score) as max_score,
-                    GROUP_CONCAT(r.score ORDER BY r.score) as all_scores
+                    GROUP_CONCAT(r.score) as all_scores
                 FROM memes m
                 LEFT JOIN rankings r ON m.id = r.meme_id AND r.session_id = ?
                 WHERE m.id = ? AND m.active = TRUE

@@ -206,6 +206,18 @@ class AdminResults {
             console.log('Updated progress bar to:', progressPercent + '%');
         }
 
+        // Update progress text
+        const progressText = document.getElementById('progress-text');
+        if (progressText) {
+            progressText.textContent = `${progressPercent.toFixed(1)}% Complete`;
+        }
+
+        // Update progress description
+        const progressDesc = document.querySelector('.card-description');
+        if (progressDesc) {
+            progressDesc.textContent = `Position ${this.revealStatus.current_position} of ${this.totalPositions}`;
+        }
+
         // Update button states
         if (this.nextBtn) {
             this.nextBtn.disabled = this.revealStatus.current_position >= this.totalPositions;
@@ -216,9 +228,15 @@ class AdminResults {
             console.log('Previous button disabled:', this.prevBtn.disabled);
         }
 
-        // Update position display
+        // Update position display with proper place naming
         if (this.positionTitle) {
-            this.positionTitle.textContent = `Position ${this.revealStatus.current_position}`;
+            if (this.revealStatus.current_position === 0) {
+                this.positionTitle.textContent = 'Ready to Reveal';
+            } else {
+                const placeName = this.getPlaceName(this.revealStatus.current_position);
+                console.log('Updating position title to:', placeName, 'for position:', this.revealStatus.current_position);
+                this.positionTitle.textContent = placeName;
+            }
         }
         if (this.positionDesc) {
             if (this.revealStatus.current_position === 0) {
@@ -226,19 +244,32 @@ class AdminResults {
             } else if (this.revealStatus.is_complete) {
                 this.positionDesc.textContent = 'All positions revealed!';
             } else {
-                this.positionDesc.textContent = `Position ${this.revealStatus.current_position} of ${this.totalPositions}`;
+                this.positionDesc.textContent = `Currently revealing...`;
             }
         }
 
-        // Show/hide current reveal section
+        // Show/hide current reveal section - only show top 3 positions
         if (this.currentReveal) {
-            if (this.revealStatus.current_position === 0) {
-                this.currentReveal.classList.add('hidden');
-                console.log('Hiding current reveal section');
-            } else {
+            const showPosition = this.revealStatus.current_position > 0 && this.revealStatus.current_position >= (this.totalPositions - 2);
+            if (showPosition) {
                 this.currentReveal.classList.remove('hidden');
                 console.log('Showing current reveal section');
+            } else {
+                this.currentReveal.classList.add('hidden');
+                console.log('Hiding current reveal section');
             }
+        }
+    }
+
+    getPlaceName(position) {
+        if (position === this.totalPositions) {
+            return '1st Place';
+        } else if (position === this.totalPositions - 1) {
+            return '2nd Place';
+        } else if (position === this.totalPositions - 2) {
+            return '3rd Place';
+        } else {
+            return `Position ${position}`;
         }
     }
 
@@ -301,7 +332,7 @@ class AdminResults {
                 btn.disabled = loading;
                 if (loading) {
                     btn.classList.add('opacity-50', 'cursor-not-allowed');
-                    btn.textContent = loading ? 'Loading...' : btn.textContent;
+                    btn.textContent = 'Loading...';
                 } else {
                     btn.classList.remove('opacity-50', 'cursor-not-allowed');
                     // Restore original text

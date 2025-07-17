@@ -1,0 +1,12 @@
+{
+  "name": "memes-ranker",
+  "version": "1.0.0",
+  "description": "Memes Ranker Application",
+  "scripts": {
+    "build:css": "tailwindcss -i ./static/css/globals.css -o ./static/css/output.css --watch",
+    "build:css:prod": "tailwindcss -i ./static/css/globals.css -o ./static/css/output.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  }
+}

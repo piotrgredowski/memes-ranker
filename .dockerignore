@@ -50,3 +50,18 @@ docker-compose*.yml
 # Documentation
 README.md
 docs/
+
+# Tailwind CSS
+static/css/output.css
+
+# Development files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# NPM/Yarn
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

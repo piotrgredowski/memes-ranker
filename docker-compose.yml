@@ -1,6 +1,16 @@
 version: '3.8'
 
 services:
+  # Static files init container
+  static-files:
+    build: .
+    user: root
+    command: ["sh", "-c", "cp -r /app/static /shared/ && chmod -R 755 /shared/static"]
+    volumes:
+      - static_files:/shared
+    networks:
+      - app-network
+
   # Nginx load balancer
   nginx:
     image: nginx:alpine
@@ -8,9 +18,9 @@ services:
       - "8081:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./static:/usr/share/nginx/html/static:ro
+      - static_files:/usr/share/nginx/html/static:ro
     depends_on:
-      - app
+      - static-files
     restart: unless-stopped
     networks:
       - app-network
@@ -25,12 +35,14 @@ services:
       - DATABASE_PATH=/app/data/memes.db
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-fallback_secret_key_change_in_production}
-      - QR_CODE_URL=${QR_CODE_URL:-http://localhost}
+      - QR_CODE_URL=${QR_CODE_URL:-http://localhost:8081}
       - GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./static/memes:/app/static/memes:ro
+    depends_on:
+      - static-files
     networks:
       - app-network
     restart: unless-stopped
@@ -42,12 +54,7 @@ services:
     deploy:
       replicas: 3
 
-# Volumes section removed - using bind mounts instead
-# Database and logs are now stored on the host filesystem:
-# - ./data:/app/data (database files)
-# - ./logs:/app/logs (log files)
-
-  # Optional: SQLite Web UI for database management
+# Optional: SQLite Web UI for database management
   # Uncomment to enable web-based database access
   # sqliteweb:
   #   image: coleifer/sqlite-web
@@ -60,6 +67,9 @@ services:
   #     - app
   #   networks:
   #     - app-network
+
+volumes:
+  static_files:
 
 networks:
   app-network:

@@ -5,9 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Memes Ranker{% endblock %}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/globals.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/components.css') }}">
+    <link rel="stylesheet" href="/static/css/output.css">
+    <link rel="stylesheet" href="/static/css/components.css">
     <meta name="description" content="Rate and rank memes with friends">
     <meta name="robots" content="noindex, nofollow">
     {% if user_name %}
@@ -67,7 +66,8 @@
         </div>
     </footer>
 
-    <!-- QR Code Widget -->
+    <!-- QR Code Widget (hidden on admin pages) -->
+    {% if not request.url.path.startswith('/admin') %}
     <div id="qr-widget" class="qr-widget">
         <button class="qr-widget-toggle" type="button" aria-label="Show QR code">
             QR
@@ -84,12 +84,13 @@
             </p>
         </div>
     </div>
+    {% endif %}
 
-    <script src="{{ url_for('static', path='/js/frontend-logger.js') }}"></script>
-    <script src="{{ url_for('static', path='/js/app.js') }}"></script>
-    <script src="{{ url_for('static', path='/js/websocket.js') }}"></script>
-    <script src="{{ url_for('static', path='/js/admin-realtime.js') }}"></script>
-    <script src="{{ url_for('static', path='/js/user-realtime.js') }}"></script>
+    <script src="/static/js/frontend-logger.js"></script>
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/websocket.js"></script>
+    <script src="/static/js/admin-realtime.js"></script>
+    <script src="/static/js/user-realtime.js"></script>
     {% block scripts %}{% endblock %}
 </body>
 

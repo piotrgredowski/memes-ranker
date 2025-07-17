@@ -1,4 +1,26 @@
-# Production FastAPI application using uv with Python base image
+# Multi-stage build for Tailwind CSS compilation
+# Stage 1: Build CSS with Node.js and Tailwind
+FROM node:18-alpine AS css-builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json .
+COPY tailwind.config.js .
+
+# Install dependencies
+RUN npm install
+
+# Copy source files needed for Tailwind
+COPY static/css/globals.css ./static/css/globals.css
+COPY templates/ ./templates/
+COPY static/js/ ./static/js/
+COPY app/ ./app/
+
+# Build CSS
+RUN npm run build:css:prod
+
+# Stage 2: Production FastAPI application
 FROM python:3.13-slim
 
 # Copy uv from the official uv image
@@ -26,11 +48,17 @@ RUN uv pip install --system --no-cache -r requirements.txt
 # Copy application code
 COPY --chown=appuser:appuser . .
 
+# Copy built CSS from the css-builder stage
+COPY --from=css-builder --chown=appuser:appuser /app/static/css/output.css ./static/css/output.css
+
 # Make entrypoint script executable
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Create necessary directories
 RUN mkdir -p data logs static/memes static/js static/css templates
+
+# Fix permissions for directories
+RUN chown -R appuser:appuser /app/data /app/logs /app/static
 
 # Switch to non-root user
 USER appuser

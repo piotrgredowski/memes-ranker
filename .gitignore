@@ -209,3 +209,6 @@ data/
 # Logs
 logs/
 .env.prod
+
+node_modules/
+cookies.*
