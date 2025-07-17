@@ -18,10 +18,16 @@ chmod 755 /home/appuser/.cache
 chown -R appuser:appuser /app/.venv
 chmod -R 755 /app/.venv
 
+# Debug: Check permissions
+echo "Debugging virtual environment permissions..."
+ls -la /app/.venv/bin/python
+whoami
+id appuser
+
 # Initialize database if needed as appuser
 echo "Checking database initialization..."
-runuser -u appuser -- /app/.venv/bin/python /app/init_db_prod.py
+su appuser -c "/app/.venv/bin/python /app/init_db_prod.py"
 
 # Start the application as appuser
 echo "Starting application with Gunicorn..."
-exec runuser -u appuser -- /app/.venv/bin/python -m gunicorn app.main:app -c gunicorn.conf.py
+exec su appuser -c "/app/.venv/bin/python -m gunicorn app.main:app -c gunicorn.conf.py"
