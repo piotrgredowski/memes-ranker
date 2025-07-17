@@ -21,6 +21,20 @@ def init_database_if_needed(db_path: str = "/app/data/memes.db"):
         print(f"Permission error creating directory {db_dir}: {e}")
         raise
 
+    # Test if we can write to the directory
+    test_file = db_dir / "test_write.tmp"
+    try:
+        test_file.touch()
+        test_file.unlink()
+        print("Directory write test passed")
+    except PermissionError as e:
+        print(f"Cannot write to directory {db_dir}: {e}")
+        print("This is likely due to host volume mount permissions")
+        print(
+            "Please ensure the host directory has proper permissions for container user"
+        )
+        raise
+
     # Check if database already exists
     if os.path.exists(db_path):
         print(f"Database already exists at: {db_path}")

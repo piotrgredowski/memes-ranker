@@ -11,6 +11,17 @@ services:
     networks:
       - app-network
 
+  # Data directory permissions fix
+  data-permissions:
+    build: .
+    user: root
+    command: ["sh", "-c", "chown -R 999:999 /app/data /app/logs && chmod -R 755 /app/data /app/logs"]
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    networks:
+      - app-network
+
   # Nginx load balancer
   nginx:
     image: nginx:alpine
@@ -43,6 +54,7 @@ services:
       - ./static/memes:/app/static/memes:ro
     depends_on:
       - static-files
+      - data-permissions
     networks:
       - app-network
     restart: unless-stopped
