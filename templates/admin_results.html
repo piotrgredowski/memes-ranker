@@ -11,7 +11,7 @@
                 <h1 class="text-3xl font-bold text-gray-900">Results Reveal</h1>
                 <p class="text-gray-600 mt-1">{{ session.name }}</p>
             </div>
-            <a href="/admin/dashboard" class="btn bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+            <a href="/admin/dashboard" class="btn btn-secondary">
                 Back to Dashboard
             </a>
         </div>
@@ -39,7 +39,7 @@
     <div class="card mb-8">
         <div class="card-content">
             <div class="flex justify-center gap-4">
-                <button id="prev-btn" class="btn bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg flex items-center gap-2"
+                <button id="prev-btn" class="btn btn-secondary btn-lg gap-2"
                         {{ 'disabled' if reveal_status.current_position <= 0 else '' }}>
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
@@ -47,7 +47,7 @@
                     Previous
                 </button>
 
-                <button id="next-btn" class="btn bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2"
+                <button id="next-btn" class="btn btn-primary btn-lg gap-2"
                         {{ 'disabled' if reveal_status.current_position >= total_positions else '' }}>
                     Next
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -55,7 +55,7 @@
                     </svg>
                 </button>
 
-                <button id="reset-btn" class="btn bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-lg flex items-center gap-2">
+                <button id="reset-btn" class="btn btn-destructive btn-lg gap-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                     </svg>
@@ -135,10 +135,10 @@
             <h3 class="text-2xl font-bold text-gray-900 mb-4">All Results Revealed!</h3>
             <p class="text-gray-600 mb-8">The complete results are now available to all users.</p>
             <div class="flex justify-center gap-4">
-                <a href="/results/{{ session.id }}" class="btn bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg">
+                <a href="/results/{{ session.id }}" class="btn btn-primary btn-lg">
                     View Public Results
                 </a>
-                <a href="/admin/dashboard" class="btn bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg">
+                <a href="/admin/dashboard" class="btn btn-secondary btn-lg">
                     Back to Dashboard
                 </a>
             </div>

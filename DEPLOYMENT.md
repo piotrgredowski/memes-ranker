@@ -32,10 +32,58 @@ The production setup includes:
    docker-compose up --build
    ```
 
+   The application will automatically:
+
+   - Initialize the database if it doesn't exist
+   - Create the required tables and schema
+   - Start the FastAPI application with Gunicorn
+   - Set up the Nginx load balancer
+
 1. **Access the application:**
 
    - Main app: http://localhost
    - Admin dashboard: http://localhost/admin
+
+## Database Management
+
+### Automatic Initialization
+
+The database is automatically initialized when the application starts. The Docker container will:
+
+1. Check if the database exists at `/app/data/memes.db`
+1. If not found, create the database with the required schema
+1. Enable WAL mode for better concurrency
+1. Set up foreign key constraints
+
+### Manual Database Operations
+
+To manually manage the database in a running container:
+
+```bash
+# Access running container
+docker-compose exec app bash
+
+# Initialize database manually (if needed)
+python /app/init_db_prod.py
+
+# Check database status
+ls -la /app/data/
+
+# Access SQLite directly
+sqlite3 /app/data/memes.db ".tables"
+```
+
+### Database Backup
+
+The database is stored in the `app-data` Docker volume. To backup:
+
+```bash
+# Create backup
+docker run --rm -v memes-ranker_app-data:/data -v $(pwd):/backup alpine tar czf /backup/db-backup-$(date +%Y%m%d).tar.gz /data
+
+# Restore backup
+docker run --rm -v memes-ranker_app-data:/data -v $(pwd):/backup alpine tar xzf /backup/db-backup-YYYYMMDD.tar.gz -C /
+```
 
 ## Configuration
 

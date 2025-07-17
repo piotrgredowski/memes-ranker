@@ -44,6 +44,9 @@ COPY --from=builder /app/.venv /app/.venv
 # Copy application code
 COPY . .
 
+# Make entrypoint script executable
+RUN chmod +x /app/docker-entrypoint.sh
+
 # Create necessary directories
 RUN mkdir -p data logs static/memes static/js static/css templates && \
     chown -R appuser:appuser /app
@@ -58,5 +61,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/api/session/status || exit 1
 
-# Default command - run with gunicorn for production
-CMD ["/app/.venv/bin/python", "-m", "gunicorn", "app.main:app", "-c", "gunicorn.conf.py"]
+# Default command - run entrypoint script
+CMD ["/app/docker-entrypoint.sh"]
