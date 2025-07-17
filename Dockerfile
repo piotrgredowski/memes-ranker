@@ -1,8 +1,10 @@
-# Multi-stage build for production FastAPI application
-# Stage 1: Build stage
-FROM python:3.13-slim as builder
+# Production FastAPI application with built-in virtual environment
+FROM python:3.13-slim
 
-# Install system dependencies required for uv and some Python packages
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     build-essential \
@@ -17,29 +19,9 @@ WORKDIR /app
 # Copy dependency files
 COPY pyproject.toml ./
 
-# Install dependencies in virtual environment
+# Create virtual environment and install dependencies
 RUN uv venv .venv && \
     uv pip install --no-cache -r pyproject.toml
-
-# Stage 2: Production stage
-FROM python:3.13-slim
-
-# Create non-root user
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install uv in production image
-RUN pip install --no-cache-dir uv
-
-# Set working directory
-WORKDIR /app
-
-# Copy virtual environment from builder stage
-COPY --from=builder /app/.venv /app/.venv
 
 # Copy application code
 COPY . .
