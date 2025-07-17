@@ -123,6 +123,16 @@
                     <h2 class="text-2xl font-bold">Rate This Meme</h2>
                 </div>
                 <p class="text-blue-100">Give it a score from 0 to 10 based on how funny it is</p>
+                {% if active_session %}
+                <div class="mt-3 bg-white bg-opacity-20 rounded-lg px-4 py-2 inline-block">
+                    <div class="flex items-center gap-2 text-sm">
+                        <svg class="w-4 h-4 text-blue-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-6m-2-5a2 2 0 012-2h2a2 2 0 012 2v3a2 2 0 01-2 2h-2a2 2 0 01-2-2v-3z"></path>
+                        </svg>
+                        <span class="text-blue-100 font-medium">Session: {{ active_session.name }}</span>
+                    </div>
+                </div>
+                {% endif %}
             </div>
 
             <!-- Meme Display -->
@@ -539,6 +549,20 @@
         submitButton.addEventListener('click', async () => {
             const memeId = submitButton.dataset.memeId;
             const score = parseInt(slider.value);
+            const startTime = Date.now();
+
+            // Log rating attempt
+            if (window.logger) {
+                window.logger.info('Rating submission started', {
+                    component: 'rating-system',
+                    action: 'submit-rating',
+                    metadata: {
+                        meme_id: memeId,
+                        score: score,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            }
 
             try {
                 // Disable all rating controls immediately
@@ -555,7 +579,23 @@
                     })
                 });
 
+                const responseTime = Date.now() - startTime;
+
                 if (response.ok) {
+                    // Log successful rating
+                    if (window.logger) {
+                        window.logger.info('Rating submitted successfully', {
+                            component: 'rating-system',
+                            action: 'submit-success',
+                            metadata: {
+                                meme_id: memeId,
+                                score: score,
+                                response_time: responseTime,
+                                status: response.status
+                            }
+                        });
+                    }
+
                     showMessage('Rating submitted successfully! Loading next meme...', 'success');
                     // Keep controls disabled and wait for next meme to load
                     setTimeout(() => {
@@ -563,11 +603,44 @@
                     }, 1500);
                 } else {
                     const error = await response.json();
+
+                    // Log rating error
+                    if (window.logger) {
+                        window.logger.error('Rating submission failed', {
+                            component: 'rating-system',
+                            action: 'submit-error',
+                            metadata: {
+                                meme_id: memeId,
+                                score: score,
+                                response_time: responseTime,
+                                status: response.status,
+                                error: error.detail || 'Unknown error'
+                            }
+                        });
+                    }
+
                     showMessage(error.detail || 'Error submitting rating', 'error');
                     // Re-enable controls on error
                     enableRatingControls();
                 }
             } catch (error) {
+                const responseTime = Date.now() - startTime;
+
+                // Log network error
+                if (window.logger) {
+                    window.logger.error('Network error during rating submission', {
+                        component: 'rating-system',
+                        action: 'network-error',
+                        metadata: {
+                            meme_id: memeId,
+                            score: score,
+                            response_time: responseTime,
+                            error: error.message
+                        },
+                        stack_trace: error.stack
+                    });
+                }
+
                 showMessage('Network error. Please try again.', 'error');
                 // Re-enable controls on error
                 enableRatingControls();
@@ -578,6 +651,21 @@
     // Skip meme (give it a score of 0)
     if (skipButton) {
         skipButton.addEventListener('click', () => {
+            const memeId = submitButton.dataset.memeId;
+
+            // Log skip action
+            if (window.logger) {
+                window.logger.info('Meme skipped', {
+                    component: 'rating-system',
+                    action: 'skip-meme',
+                    metadata: {
+                        meme_id: memeId,
+                        original_score: slider.value,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            }
+
             slider.value = 0;
             display.textContent = '0';
             submitButton.click();
@@ -649,7 +737,30 @@
     function initializeSessionMonitoring() {
         // Only initialize if we're on the waiting screen
         if (!document.querySelector('.bg-gradient-to-r.from-orange-500')) {
+            // Log that we're not on waiting screen
+            if (window.logger) {
+                window.logger.debug('Session monitoring not needed - not on waiting screen', {
+                    component: 'session-monitor',
+                    action: 'skip-initialization',
+                    metadata: {
+                        url: window.location.href,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            }
             return;
+        }
+
+        // Log that we're setting up session monitoring
+        if (window.logger) {
+            window.logger.info('Setting up session monitoring for waiting screen', {
+                component: 'session-monitor',
+                action: 'setup-monitoring',
+                metadata: {
+                    url: window.location.href,
+                    timestamp: new Date().toISOString()
+                }
+            });
         }
 
         // Initialize WebSocket connection for real-time updates
@@ -660,6 +771,19 @@
 
             userSocket.onopen = function(event) {
                 console.log('User WebSocket connected');
+
+                // Log WebSocket connection
+                if (window.logger) {
+                    window.logger.info('WebSocket connection established', {
+                        component: 'websocket',
+                        action: 'connection-open',
+                        metadata: {
+                            url: wsUrl,
+                            ready_state: userSocket.readyState,
+                            timestamp: new Date().toISOString()
+                        }
+                    });
+                }
             };
 
             userSocket.onmessage = function(event) {
@@ -667,8 +791,32 @@
                     const data = JSON.parse(event.data);
                     console.log('WebSocket message received:', data.type);
 
+                    // Log WebSocket message
+                    if (window.logger) {
+                        window.logger.info('WebSocket message received', {
+                            component: 'websocket',
+                            action: 'message-received',
+                            metadata: {
+                                message_type: data.type,
+                                message_data: data,
+                                timestamp: new Date().toISOString()
+                            }
+                        });
+                    }
+
                     // Only reload when a session actually starts (not just created)
                     if (data.type === 'session_started') {
+                        if (window.logger) {
+                            window.logger.info('Session started notification received', {
+                                component: 'session-monitor',
+                                action: 'session-started',
+                                metadata: {
+                                    session_data: data,
+                                    timestamp: new Date().toISOString()
+                                }
+                            });
+                        }
+
                         showMessage('Session started! Loading memes...', 'success');
                         setTimeout(() => {
                             window.location.reload();
@@ -677,36 +825,144 @@
                     // Ignore other message types like connection_established, ping, etc.
                 } catch (error) {
                     console.error('Error parsing WebSocket message:', error);
+
+                    // Log WebSocket parsing error
+                    if (window.logger) {
+                        window.logger.error('WebSocket message parsing error', {
+                            component: 'websocket',
+                            action: 'message-parse-error',
+                            metadata: {
+                                raw_message: event.data,
+                                error_message: error.message,
+                                timestamp: new Date().toISOString()
+                            },
+                            stack_trace: error.stack
+                        });
+                    }
                 }
             };
 
             userSocket.onclose = function(event) {
                 console.log('User WebSocket disconnected');
+
+                // Log WebSocket disconnection
+                if (window.logger) {
+                    window.logger.warn('WebSocket connection closed', {
+                        component: 'websocket',
+                        action: 'connection-close',
+                        metadata: {
+                            code: event.code,
+                            reason: event.reason,
+                            was_clean: event.wasClean,
+                            timestamp: new Date().toISOString()
+                        }
+                    });
+                }
+
                 // Attempt to reconnect after 5 seconds
                 setTimeout(initializeSessionMonitoring, 5000);
             };
 
             userSocket.onerror = function(error) {
                 console.error('WebSocket error:', error);
+
+                // Log WebSocket error
+                if (window.logger) {
+                    window.logger.error('WebSocket connection error', {
+                        component: 'websocket',
+                        action: 'connection-error',
+                        metadata: {
+                            error_type: error.type || 'unknown',
+                            timestamp: new Date().toISOString()
+                        }
+                    });
+                }
             };
         } catch (error) {
             console.error('Error initializing WebSocket:', error);
+
+            // Log WebSocket initialization error
+            if (window.logger) {
+                window.logger.error('WebSocket initialization failed', {
+                    component: 'websocket',
+                    action: 'initialization-error',
+                    metadata: {
+                        error_message: error.message,
+                        timestamp: new Date().toISOString()
+                    },
+                    stack_trace: error.stack
+                });
+            }
         }
 
         // Check periodically via HTTP in case WebSocket fails (start after 30 seconds)
         setTimeout(() => {
+            // Log periodic session check setup
+            if (window.logger) {
+                window.logger.info('Setting up periodic session status checks', {
+                    component: 'session-monitor',
+                    action: 'setup-periodic-check',
+                    metadata: {
+                        check_interval: 30000,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            }
+
             sessionCheckInterval = setInterval(checkSessionStatus, 30000); // Check every 30 seconds
         }, 30000);
     }
 
     // Check session status via API
     async function checkSessionStatus() {
+        const startTime = Date.now();
+
         try {
+            // Log session status check start
+            if (window.logger) {
+                window.logger.debug('Checking session status via API', {
+                    component: 'session-monitor',
+                    action: 'api-check-start',
+                    metadata: {
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            }
+
             const response = await fetch('/api/session/status');
+            const responseTime = Date.now() - startTime;
+
             if (response.ok) {
                 const data = await response.json();
+
+                // Log successful session check
+                if (window.logger) {
+                    window.logger.debug('Session status check successful', {
+                        component: 'session-monitor',
+                        action: 'api-check-success',
+                        metadata: {
+                            has_active_session: data.has_active_session,
+                            session_name: data.session_name,
+                            response_time: responseTime,
+                            timestamp: new Date().toISOString()
+                        }
+                    });
+                }
+
                 if (data.has_active_session) {
                     // Session exists, reload the page
+                    if (window.logger) {
+                        window.logger.info('Active session detected via API check', {
+                            component: 'session-monitor',
+                            action: 'session-detected',
+                            metadata: {
+                                session_name: data.session_name,
+                                response_time: responseTime,
+                                timestamp: new Date().toISOString()
+                            }
+                        });
+                    }
+
                     showMessage('Session started! Loading memes...', 'success');
                     setTimeout(() => {
                         window.location.reload();
@@ -715,20 +971,74 @@
                 // If no active session, continue waiting without error
             } else {
                 console.log('Session status check failed, continuing to wait...');
+
+                // Log failed session check
+                if (window.logger) {
+                    window.logger.warn('Session status check failed', {
+                        component: 'session-monitor',
+                        action: 'api-check-failed',
+                        metadata: {
+                            status: response.status,
+                            status_text: response.statusText,
+                            response_time: responseTime,
+                            timestamp: new Date().toISOString()
+                        }
+                    });
+                }
             }
         } catch (error) {
             // Network error, keep waiting
             console.log('Session check failed, continuing to wait...');
+            const responseTime = Date.now() - startTime;
+
+            // Log network error during session check
+            if (window.logger) {
+                window.logger.warn('Network error during session status check', {
+                    component: 'session-monitor',
+                    action: 'api-check-network-error',
+                    metadata: {
+                        error_message: error.message,
+                        response_time: responseTime,
+                        timestamp: new Date().toISOString()
+                    },
+                    stack_trace: error.stack
+                });
+            }
         }
     }
 
     // Initialize when page loads
     document.addEventListener('DOMContentLoaded', function() {
+        // Log session monitoring initialization
+        if (window.logger) {
+            window.logger.info('Initializing session monitoring', {
+                component: 'session-monitor',
+                action: 'initialization',
+                metadata: {
+                    url: window.location.href,
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+
         initializeSessionMonitoring();
     });
 
     // Cleanup on page unload
     window.addEventListener('beforeunload', function() {
+        // Log cleanup process
+        if (window.logger) {
+            window.logger.debug('Cleaning up session monitoring resources', {
+                component: 'session-monitor',
+                action: 'cleanup',
+                metadata: {
+                    has_websocket: !!userSocket,
+                    has_interval: !!sessionCheckInterval,
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+
         if (userSocket) {
             userSocket.close();
         }

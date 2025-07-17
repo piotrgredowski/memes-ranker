@@ -17,6 +17,8 @@ def setup_logging(
     logs_dir: str = "logs",
     json_log_file: str = "app_json.log",
     text_log_file: str = "app.log",
+    frontend_json_log: str = "frontend_json.log",
+    frontend_text_log: str = "frontend.log",
     max_bytes: int = 10 * 1024 * 1024,  # 10MB
     backup_count: int = 5,
     console_level: int = logging.INFO,
@@ -28,6 +30,8 @@ def setup_logging(
         logs_dir: Directory to store log files
         json_log_file: Name of the JSON structured log file
         text_log_file: Name of the human-readable log file
+        frontend_json_log: Name of the frontend JSON log file
+        frontend_text_log: Name of the frontend text log file
         max_bytes: Maximum size of each log file before rotation
         backup_count: Number of backup files to keep
         console_level: Logging level for console output
@@ -204,3 +208,72 @@ def setup_fastapi_error_logging(app):
         app: FastAPI application instance
     """
     app.middleware("http")(log_exceptions_middleware)
+
+
+def setup_frontend_logging(
+    logs_dir: str = "logs",
+    frontend_json_log: str = "frontend_json.log",
+    frontend_text_log: str = "frontend.log",
+    max_bytes: int = 10 * 1024 * 1024,  # 10MB
+    backup_count: int = 5,
+    file_level: int = logging.INFO,
+) -> tuple[logging.Logger, logging.Logger]:
+    """Setup dedicated frontend logging handlers.
+
+    Args:
+        logs_dir: Directory to store log files
+        frontend_json_log: Name of the frontend JSON log file
+        frontend_text_log: Name of the frontend text log file
+        max_bytes: Maximum size of each log file before rotation
+        backup_count: Number of backup files to keep
+        file_level: Logging level for file output
+
+    Returns:
+        Tuple of (json_logger, text_logger)
+    """
+    # Create logs directory
+    logs_path = Path(logs_dir)
+    logs_path.mkdir(exist_ok=True)
+
+    # Frontend JSON logger
+    frontend_json_logger = logging.getLogger("frontend_json")
+    frontend_json_logger.setLevel(file_level)
+    frontend_json_logger.handlers.clear()
+
+    json_handler = RotatingFileHandler(
+        logs_path / frontend_json_log,
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        encoding="utf-8",
+    )
+    json_handler.setLevel(file_level)
+    json_handler.setFormatter(logging.Formatter("%(message)s"))
+    frontend_json_logger.addHandler(json_handler)
+
+    # Frontend text logger
+    frontend_text_logger = logging.getLogger("frontend_text")
+    frontend_text_logger.setLevel(file_level)
+    frontend_text_logger.handlers.clear()
+
+    text_handler = RotatingFileHandler(
+        logs_path / frontend_text_log,
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        encoding="utf-8",
+    )
+    text_handler.setLevel(file_level)
+    text_handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    )
+    frontend_text_logger.addHandler(text_handler)
+
+    return frontend_json_logger, frontend_text_logger
+
+
+def get_frontend_loggers() -> tuple[logging.Logger, logging.Logger]:
+    """Get frontend loggers.
+
+    Returns:
+        Tuple of (json_logger, text_logger)
+    """
+    return logging.getLogger("frontend_json"), logging.getLogger("frontend_text")

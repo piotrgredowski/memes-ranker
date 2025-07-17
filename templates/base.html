@@ -10,6 +10,12 @@
     <link rel="stylesheet" href="{{ url_for('static', path='/css/components.css') }}">
     <meta name="description" content="Rate and rank memes with friends">
     <meta name="robots" content="noindex, nofollow">
+    {% if user_name %}
+    <meta name="user-name" content="{{ user_name }}">
+    {% endif %}
+    {% if session_token %}
+    <meta name="session-token" content="{{ session_token }}">
+    {% endif %}
 </head>
 
 <body class="flex flex-col min-h-screen">
@@ -80,6 +86,7 @@
         </div>
     </div>
 
+    <script src="{{ url_for('static', path='/js/frontend-logger.js') }}"></script>
     <script src="{{ url_for('static', path='/js/app.js') }}"></script>
     <script src="{{ url_for('static', path='/js/websocket.js') }}"></script>
     <script src="{{ url_for('static', path='/js/admin-realtime.js') }}"></script>

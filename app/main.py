@@ -23,7 +23,14 @@ from .auth import authenticate_admin, create_admin_token, get_current_admin
 from .database import db
 from .websocket_manager import websocket_manager
 from .events import event_broadcaster
-from .logging_config import setup_logging, get_logger, setup_fastapi_error_logging
+from .logging_config import (
+    setup_logging,
+    get_logger,
+    setup_fastapi_error_logging,
+    setup_frontend_logging,
+    get_frontend_loggers,
+)
+from .models import FrontendLogBatch, SessionRequest, RankingRequest
 from .utils import (
     generate_user_name,
     generate_session_token,
@@ -34,6 +41,7 @@ from .utils import (
 
 # Configure logging
 setup_logging()
+setup_frontend_logging()
 
 # Create FastAPI app
 app = FastAPI(
@@ -104,15 +112,6 @@ class LoginRequest(BaseModel):
     password: str
 
 
-class RankingRequest(BaseModel):
-    meme_id: int
-    score: int
-
-
-class SessionRequest(BaseModel):
-    name: str
-
-
 # Helper functions
 def get_user_session(request: Request) -> Optional[dict]:
     """Get user session from cookies."""
@@ -175,6 +174,7 @@ async def index(request: Request):
             {
                 "request": request,
                 "user_name": user["name"],
+                "session_token": session_token,
                 "memes": [],
                 "current_meme": None,
                 "user_rankings": [],
@@ -204,6 +204,7 @@ async def index(request: Request):
         {
             "request": request,
             "user_name": user["name"],
+            "session_token": session_token,
             "memes": memes,
             "current_meme": current_meme,
             "user_rankings": user_rankings,
@@ -297,6 +298,8 @@ async def admin_dashboard(request: Request, admin: dict = Depends(get_current_ad
         {
             "request": request,
             "is_dashboard": True,
+            "user_name": admin["username"],
+            "session_token": request.cookies.get("session_token"),
             "meme_stats": meme_stats,
             "active_session": active_session,
             "session_stats": session_stats,
@@ -672,6 +675,74 @@ async def get_session_status():
         "has_active_session": active_session is not None,
         "session_name": active_session["name"] if active_session else None,
     }
+
+
+@app.post("/api/frontend-logs")
+async def receive_frontend_logs(request: Request, log_batch: FrontendLogBatch):
+    """Receive and process frontend logs."""
+    import json
+    from datetime import datetime
+
+    # Get loggers
+    json_logger, text_logger = get_frontend_loggers()
+
+    # Get client info
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+
+    # Process each log entry
+    for log_entry in log_batch.logs:
+        # Prepare log data
+        log_data = {
+            "timestamp": log_entry.timestamp.isoformat(),
+            "level": log_entry.level,
+            "message": log_entry.message,
+            "url": log_entry.url,
+            "user_agent": log_entry.user_agent or user_agent,
+            "session_id": log_entry.session_id,
+            "user_id": log_entry.user_id,
+            "component": log_entry.component,
+            "action": log_entry.action,
+            "metadata": log_entry.metadata,
+            "stack_trace": log_entry.stack_trace,
+            "client_ip": client_ip,
+            "server_timestamp": datetime.now().isoformat(),
+        }
+
+        # Add client info from batch
+        if log_batch.client_info:
+            log_data["client_info"] = log_batch.client_info
+
+        # Log to JSON file
+        json_logger.info(json.dumps(log_data))
+
+        # Log to text file
+        text_message = f"[{log_entry.level.upper()}] {log_entry.message}"
+        if log_entry.component:
+            text_message += f" | Component: {log_entry.component}"
+        if log_entry.action:
+            text_message += f" | Action: {log_entry.action}"
+        if log_entry.session_id:
+            text_message += f" | Session: {log_entry.session_id}"
+        if log_entry.user_id:
+            text_message += f" | User: {log_entry.user_id}"
+        text_message += f" | URL: {log_entry.url}"
+        if log_entry.metadata:
+            text_message += f" | Metadata: {json.dumps(log_entry.metadata)}"
+
+        # Log to appropriate level
+        if log_entry.level == "debug":
+            text_logger.debug(text_message)
+        elif log_entry.level == "info":
+            text_logger.info(text_message)
+        elif log_entry.level == "warn":
+            text_logger.warning(text_message)
+        elif log_entry.level == "error":
+            text_logger.error(text_message)
+            if log_entry.stack_trace:
+                text_logger.error(f"Stack trace: {log_entry.stack_trace}")
+
+    return {"status": "success", "processed": len(log_batch.logs)}
 
 
 # Initialize memes on startup
