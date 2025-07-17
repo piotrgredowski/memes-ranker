@@ -5,8 +5,8 @@ This script initializes the SQLite database with the required schema.
 Run this script before starting the application for the first time.
 """
 
-import sqlite3
 import os
+import sqlite3
 from pathlib import Path
 
 

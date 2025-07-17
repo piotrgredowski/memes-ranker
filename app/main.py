@@ -3,7 +3,6 @@
 import os
 from pathlib import Path
 from typing import Optional
-import logging
 
 from fastapi import (
     FastAPI,
@@ -24,6 +23,7 @@ from .auth import authenticate_admin, create_admin_token, get_current_admin
 from .database import db
 from .websocket_manager import websocket_manager
 from .events import event_broadcaster
+from .logging_config import setup_logging, get_logger, setup_fastapi_error_logging
 from .utils import (
     generate_user_name,
     generate_session_token,
@@ -33,7 +33,7 @@ from .utils import (
 )
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+setup_logging()
 
 # Create FastAPI app
 app = FastAPI(
@@ -41,6 +41,9 @@ app = FastAPI(
     description="A FastAPI application for ranking memes",
     version="1.0.0",
 )
+
+# Setup error logging middleware
+setup_fastapi_error_logging(app)
 
 # Create directories
 Path("static").mkdir(exist_ok=True)
@@ -246,13 +249,14 @@ async def admin_login(request: Request):
 @app.post("/admin/login")
 async def admin_login_post(password: str = Form(...)):
     """Admin login endpoint."""
-    print(f"Admin login attempt with password: {password}")
+    logger = get_logger(__name__)
+    logger.info("Admin login attempt", password_length=len(password))
 
     if not authenticate_admin(password):
-        print("Authentication failed")
+        logger.warning("Admin authentication failed")
         raise HTTPException(status_code=401, detail="Invalid password")
 
-    print("Authentication successful, creating token")
+    logger.info("Admin authentication successful, creating token")
     token = create_admin_token()
     response = RedirectResponse(url="/admin/dashboard", status_code=302)
     response.set_cookie(
@@ -262,14 +266,15 @@ async def admin_login_post(password: str = Form(...)):
         httponly=True,
         secure=False,  # Set to True in production
     )
-    print("Redirecting to dashboard")
+    logger.info("Redirecting to admin dashboard")
     return response
 
 
 @app.get("/admin/dashboard", response_class=HTMLResponse)
 async def admin_dashboard(request: Request, admin: dict = Depends(get_current_admin)):
     """Admin dashboard."""
-    print(f"Admin dashboard accessed by: {admin}")
+    logger = get_logger(__name__)
+    logger.info("Admin dashboard accessed", admin_user=admin["username"])
     # Get statistics
     meme_stats = await db.get_meme_stats()
     active_session = await db.get_active_session()
@@ -338,7 +343,8 @@ async def populate_memes(admin: dict = Depends(get_current_admin)):
     try:
         await event_broadcaster.broadcast_memes_populated(len(meme_files))
     except Exception as e:
-        print(f"Failed to broadcast memes populated event: {e}")
+        logger = get_logger(__name__)
+        logger.error("Failed to broadcast memes populated event", error=str(e))
 
     return {"status": "success", "memes_added": len(meme_files)}
 
@@ -412,7 +418,8 @@ async def startup_event():
     if meme_files:
         existing_memes = await db.get_active_memes()
         if not existing_memes:
-            print(f"Populating {len(meme_files)} memes from static/memes directory")
+            logger = get_logger(__name__)
+            logger.info("Populating memes from directory", meme_count=len(meme_files))
             for filename in meme_files:
                 path = f"/static/memes/{filename}"
                 await db.create_meme(filename, path)

@@ -73,3 +73,8 @@ This is a complete FastAPI application with:
 - **Authentication**: JWT-based admin authentication
 - **Session Management**: Cookie-based user sessions
 - **Testing**: Integration tests for complete game flow
+
+## Logging and Debugging
+
+- **Log Tailing**: Use command to check logs and tail last 50 lines
+  - `tail -n 50 logs/app_json.log`

@@ -18,6 +18,7 @@ dependencies = [
     "python-jose[cryptography]>=3.5.0",
     "python-multipart>=0.0.20",
     "qrcode[pil]>=8.2",
+    "structlog>=25.4.0",
     "uvicorn[standard]>=0.35.0",
     "websockets>=12.0",
 ]

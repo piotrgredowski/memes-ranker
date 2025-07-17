@@ -205,3 +205,6 @@ __marimo__/
 
 # DBs
 data/
+
+# Logs
+logs/

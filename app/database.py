@@ -9,6 +9,10 @@ from typing import Any, Dict, List, Optional
 
 import aiosqlite
 
+from .logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 # Import will be added after database class to avoid circular import
 _event_broadcaster = None
@@ -203,7 +207,7 @@ class Database:
                 await broadcaster.broadcast_stats_update({"meme_stats": meme_stats})
 
             except Exception as e:
-                print(f"Failed to broadcast rating event: {e}")
+                logger.error(f"Failed to broadcast rating event: {e}")
 
             return ranking_id
 
@@ -301,7 +305,7 @@ class Database:
                 )
             except Exception as e:
                 # Don't fail the operation if broadcasting fails
-                print(f"Failed to broadcast session created event: {e}")
+                logger.error("Failed to broadcast session created event", error=str(e))
 
             return session_id
 
@@ -351,7 +355,9 @@ class Database:
                         EventType.SESSION_STARTED, session_data
                     )
                 except Exception as e:
-                    print(f"Failed to broadcast session started event: {e}")
+                    logger.error(
+                        "Failed to broadcast session started event", error=str(e)
+                    )
 
     async def end_session(self, session_id: int):
         """End a session.
@@ -384,7 +390,9 @@ class Database:
                         EventType.SESSION_FINISHED, session_data
                     )
                 except Exception as e:
-                    print(f"Failed to broadcast session finished event: {e}")
+                    logger.error(
+                        "Failed to broadcast session finished event", error=str(e)
+                    )
 
     async def get_total_vote_count(self) -> int:
         """Get total number of votes/rankings submitted.

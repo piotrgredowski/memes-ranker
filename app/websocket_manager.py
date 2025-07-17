@@ -2,12 +2,13 @@
 
 import asyncio
 import json
-import logging
 from typing import Dict, Set
 from fastapi import WebSocket, WebSocketDisconnect
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
+from .logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class WebSocketManager:
