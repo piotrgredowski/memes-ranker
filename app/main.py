@@ -5,11 +5,11 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import (
-    FastAPI,
-    Request,
-    HTTPException,
     Depends,
+    FastAPI,
     Form,
+    HTTPException,
+    Request,
     Response,
     WebSocket,
     WebSocketDisconnect,
@@ -21,23 +21,23 @@ from pydantic import BaseModel
 
 from .auth import authenticate_admin, create_admin_token, get_current_admin
 from .database import db
-from .websocket_manager import websocket_manager
 from .events import event_broadcaster
 from .logging_config import (
-    setup_logging,
+    get_frontend_loggers,
     get_logger,
     setup_fastapi_error_logging,
     setup_frontend_logging,
-    get_frontend_loggers,
+    setup_logging,
 )
-from .models import FrontendLogBatch, SessionRequest, RankingRequest
+from .models import FrontendLogBatch, RankingRequest, SessionRequest
 from .utils import (
-    generate_user_name,
-    generate_session_token,
     generate_qr_code,
-    get_meme_files,
+    generate_session_token,
+    generate_user_name,
     get_app_config,
+    get_meme_files,
 )
+from .websocket_manager import websocket_manager
 
 # Configure logging
 setup_logging()
@@ -423,7 +423,7 @@ async def admin_results_page(
             {
                 "request": request,
                 "session": dict(session),
-                "results": results,
+                "results": results[-3:],
                 "reveal_status": reveal_status,
                 "total_positions": len(results),
             },
