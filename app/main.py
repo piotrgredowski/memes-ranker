@@ -369,8 +369,7 @@ async def start_results_reveal(
     """Start results reveal for a session."""
     try:
         # Check if session exists and is finished
-        session_cursor = await db.get_connection()
-        async with session_cursor as conn:
+        async with db.get_connection() as conn:
             cursor = await conn.execute(
                 "SELECT * FROM sessions WHERE id = ?", (session_id,)
             )
@@ -413,6 +412,11 @@ async def admin_results_page(
 
         results = await db.get_session_results(session_id)
         reveal_status = await db.get_reveal_status(session_id)
+
+        # If no reveal status exists, initialize it
+        if not reveal_status:
+            await db.create_results_reveal(session_id)
+            reveal_status = await db.get_reveal_status(session_id)
 
         return templates.TemplateResponse(
             "admin_results.html",

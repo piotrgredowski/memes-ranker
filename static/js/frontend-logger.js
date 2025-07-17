@@ -290,8 +290,12 @@ class FrontendLogger {
      * Setup global error handlers
      */
     setupErrorHandlers() {
+        // Log that error handlers are being set up
+        console.log('Setting up frontend error handlers...');
+
         // Global JavaScript errors
         window.addEventListener('error', (event) => {
+            console.log('Global error handler triggered:', event);
             this.error('JavaScript Error', {
                 component: 'global-error-handler',
                 action: 'javascript-error',
@@ -308,6 +312,7 @@ class FrontendLogger {
 
         // Unhandled promise rejections
         window.addEventListener('unhandledrejection', (event) => {
+            console.log('Unhandled promise rejection handler triggered:', event);
             this.error('Unhandled Promise Rejection', {
                 component: 'global-error-handler',
                 action: 'promise-rejection',
@@ -322,6 +327,7 @@ class FrontendLogger {
         // Resource loading errors
         window.addEventListener('error', (event) => {
             if (event.target !== window) {
+                console.log('Resource load error handler triggered:', event);
                 this.error('Resource Load Error', {
                     component: 'global-error-handler',
                     action: 'resource-error',
@@ -333,6 +339,26 @@ class FrontendLogger {
                 });
             }
         }, true);
+
+        // Override console.error to capture console errors
+        const originalConsoleError = console.error;
+        console.error = (...args) => {
+            // Call original console.error
+            originalConsoleError.apply(console, args);
+
+            // Log to our frontend logger
+            this.error('Console Error', {
+                component: 'console-error-handler',
+                action: 'console-error',
+                metadata: {
+                    arguments: args.map(arg =>
+                        typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                    ).join(' ')
+                }
+            });
+        };
+
+        console.log('Frontend error handlers installed successfully');
     }
 
     /**
@@ -421,6 +447,34 @@ class FrontendLogger {
                 ...metadata
             }
         });
+    }
+
+    /**
+     * Test error handlers - for debugging purposes
+     */
+    testErrorHandlers() {
+        console.log('Testing error handlers...');
+
+        // Test console.error capture
+        console.error('Test console error message', { test: 'data' });
+
+        // Test JavaScript error
+        setTimeout(() => {
+            throw new Error('Test JavaScript error');
+        }, 100);
+
+        // Test promise rejection
+        setTimeout(() => {
+            Promise.reject(new Error('Test promise rejection'));
+        }, 200);
+
+        // Test resource loading error
+        setTimeout(() => {
+            const img = document.createElement('img');
+            img.src = '/nonexistent-image.jpg';
+            document.body.appendChild(img);
+            setTimeout(() => document.body.removeChild(img), 1000);
+        }, 300);
     }
 
     /**

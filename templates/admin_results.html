@@ -148,10 +148,10 @@
 
 <!-- Hidden data for JavaScript -->
 <script>
-    const sessionId = {{ session.id }};
-    const results = {{ results|tojson }};
-    const initialRevealStatus = {{ reveal_status|tojson }};
-    const totalPositions = {{ total_positions }};
+    window.sessionId = {{ session.id }};
+    window.results = {{ results|tojson }};
+    window.initialRevealStatus = {{ reveal_status|tojson }};
+    window.totalPositions = {{ total_positions }};
 </script>
 {% endblock %}
 
