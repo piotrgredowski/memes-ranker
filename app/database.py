@@ -10,6 +10,20 @@ from typing import Any, Dict, List, Optional
 import aiosqlite
 
 
+# Import will be added after database class to avoid circular import
+_event_broadcaster = None
+
+
+def get_event_broadcaster():
+    """Get event broadcaster instance (lazy import to avoid circular dependency)."""
+    global _event_broadcaster
+    if _event_broadcaster is None:
+        from .events import event_broadcaster
+
+        _event_broadcaster = event_broadcaster
+    return _event_broadcaster
+
+
 class Database:
     """Async SQLite database manager."""
 
@@ -167,7 +181,31 @@ class Database:
                 (user_id, meme_id, score),
             )
             await conn.commit()
-            return cursor.lastrowid
+            ranking_id = cursor.lastrowid
+
+            # Broadcast new rating event
+            try:
+                from .events import EventType
+
+                broadcaster = get_event_broadcaster()
+                await broadcaster.broadcast_rating_event(
+                    EventType.NEW_RATING,
+                    {
+                        "ranking_id": ranking_id,
+                        "user_id": user_id,
+                        "meme_id": meme_id,
+                        "score": score,
+                    },
+                )
+
+                # Also broadcast stats update
+                meme_stats = await self.get_meme_stats()
+                await broadcaster.broadcast_stats_update({"meme_stats": meme_stats})
+
+            except Exception as e:
+                print(f"Failed to broadcast rating event: {e}")
+
+            return ranking_id
 
     async def get_user_rankings(self, user_id: int) -> List[Dict[str, Any]]:
         """Get all rankings for a user.
@@ -251,7 +289,21 @@ class Database:
                 "INSERT INTO sessions (name) VALUES (?)", (name,)
             )
             await conn.commit()
-            return cursor.lastrowid
+            session_id = cursor.lastrowid
+
+            # Broadcast session created event
+            try:
+                from .events import EventType
+
+                broadcaster = get_event_broadcaster()
+                await broadcaster.broadcast_session_event(
+                    EventType.SESSION_CREATED, {"id": session_id, "name": name}
+                )
+            except Exception as e:
+                # Don't fail the operation if broadcasting fails
+                print(f"Failed to broadcast session created event: {e}")
+
+            return session_id
 
     async def get_active_session(self) -> Optional[Dict[str, Any]]:
         """Get currently active session.
@@ -282,6 +334,25 @@ class Database:
             )
             await conn.commit()
 
+            # Get session details for broadcasting
+            cursor = await conn.execute(
+                "SELECT * FROM sessions WHERE id = ?", (session_id,)
+            )
+            session_row = await cursor.fetchone()
+
+            if session_row:
+                # Broadcast session started event
+                try:
+                    from .events import EventType
+
+                    broadcaster = get_event_broadcaster()
+                    session_data = dict(session_row)
+                    await broadcaster.broadcast_session_event(
+                        EventType.SESSION_STARTED, session_data
+                    )
+                except Exception as e:
+                    print(f"Failed to broadcast session started event: {e}")
+
     async def end_session(self, session_id: int):
         """End a session.
 
@@ -289,11 +360,31 @@ class Database:
             session_id: Session ID to end
         """
         async with self.get_connection() as conn:
+            # Get session details before ending
+            cursor = await conn.execute(
+                "SELECT * FROM sessions WHERE id = ?", (session_id,)
+            )
+            session_row = await cursor.fetchone()
+
             await conn.execute(
                 "UPDATE sessions SET active = FALSE, end_time = CURRENT_TIMESTAMP WHERE id = ?",
                 (session_id,),
             )
             await conn.commit()
+
+            if session_row:
+                # Broadcast session finished event
+                try:
+                    from .events import EventType
+
+                    broadcaster = get_event_broadcaster()
+                    session_data = dict(session_row)
+                    session_data["active"] = False  # Update status
+                    await broadcaster.broadcast_session_event(
+                        EventType.SESSION_FINISHED, session_data
+                    )
+                except Exception as e:
+                    print(f"Failed to broadcast session finished event: {e}")
 
 
 # Global database instance

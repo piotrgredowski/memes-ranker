@@ -3,8 +3,18 @@
 import os
 from pathlib import Path
 from typing import Optional
+import logging
 
-from fastapi import FastAPI, Request, HTTPException, Depends, Form, Response
+from fastapi import (
+    FastAPI,
+    Request,
+    HTTPException,
+    Depends,
+    Form,
+    Response,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -12,6 +22,8 @@ from pydantic import BaseModel
 
 from .auth import authenticate_admin, create_admin_token, get_current_admin
 from .database import db
+from .websocket_manager import websocket_manager
+from .events import event_broadcaster
 from .utils import (
     generate_user_name,
     generate_session_token,
@@ -19,6 +31,9 @@ from .utils import (
     get_meme_files,
     get_app_config,
 )
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 # Create FastAPI app
 app = FastAPI(
@@ -39,6 +54,46 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Templates
 templates = Jinja2Templates(directory="templates")
+
+# Initialize WebSocket event broadcaster
+event_broadcaster.set_websocket_manager(websocket_manager)
+
+
+# WebSocket endpoints
+@app.websocket("/ws/admin")
+async def websocket_admin_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for admin real-time updates."""
+    client_id = f"admin_{id(websocket)}"
+    await websocket_manager.connect(websocket, "admin", client_id)
+
+    try:
+        while True:
+            # Listen for incoming messages (mainly for ping/pong)
+            data = await websocket.receive_text()
+            # For now, just echo back (can be enhanced for bidirectional communication)
+            await websocket_manager.send_personal_message(
+                websocket, {"type": "echo", "data": data}
+            )
+    except WebSocketDisconnect:
+        await websocket_manager.disconnect(websocket)
+
+
+@app.websocket("/ws/user")
+async def websocket_user_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for user real-time updates."""
+    client_id = f"user_{id(websocket)}"
+    await websocket_manager.connect(websocket, "users", client_id)
+
+    try:
+        while True:
+            # Listen for incoming messages
+            data = await websocket.receive_text()
+            # Echo back for now
+            await websocket_manager.send_personal_message(
+                websocket, {"type": "echo", "data": data}
+            )
+    except WebSocketDisconnect:
+        await websocket_manager.disconnect(websocket)
 
 
 # Pydantic models
@@ -245,6 +300,12 @@ async def populate_memes(admin: dict = Depends(get_current_admin)):
     for filename in meme_files:
         path = f"/static/memes/{filename}"
         await db.create_meme(filename, path)
+
+    # Broadcast memes populated event
+    try:
+        await event_broadcaster.broadcast_memes_populated(len(meme_files))
+    except Exception as e:
+        print(f"Failed to broadcast memes populated event: {e}")
 
     return {"status": "success", "memes_added": len(meme_files)}
 

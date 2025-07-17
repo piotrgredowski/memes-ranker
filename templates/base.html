@@ -38,7 +38,8 @@
     </main>
 
     <!-- Sticky Footer -->
-    <footer class="sticky bottom-0 z-30 bg-background border-t border-border py-4 text-center text-sm text-muted-foreground">
+    <footer
+        class="sticky bottom-0 z-30 bg-background border-t border-border py-4 text-center text-sm text-muted-foreground">
         <div class="container">
             <p>&copy; 2025 Memes Ranker by <a href="https://github.com/piotrgredowski">@piotrgredowski</a>. Rate
                 responsibly! 🎯
@@ -65,6 +66,9 @@
     </div>
 
     <script src="{{ url_for('static', path='/js/app.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/websocket.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/admin-realtime.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/user-realtime.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 
