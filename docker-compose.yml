@@ -28,8 +28,8 @@ services:
       - QR_CODE_URL=${QR_CODE_URL:-http://localhost}
       - GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
     volumes:
-      - app-data:/app/data
-      - app-logs:/app/logs
+      - ./data:/app/data
+      - ./logs:/app/logs
       - ./static/memes:/app/static/memes:ro
     networks:
       - app-network
@@ -42,11 +42,24 @@ services:
     deploy:
       replicas: 3
 
-volumes:
-  app-data:
-    driver: local
-  app-logs:
-    driver: local
+# Volumes section removed - using bind mounts instead
+# Database and logs are now stored on the host filesystem:
+# - ./data:/app/data (database files)
+# - ./logs:/app/logs (log files)
+
+  # Optional: SQLite Web UI for database management
+  # Uncomment to enable web-based database access
+  # sqliteweb:
+  #   image: coleifer/sqlite-web
+  #   ports:
+  #     - "8080:8080"
+  #   volumes:
+  #     - ./data:/data
+  #   command: ["sqlite_web", "/data/memes.db", "--host", "0.0.0.0", "--port", "8080"]
+  #   depends_on:
+  #     - app
+  #   networks:
+  #     - app-network
 
 networks:
   app-network:

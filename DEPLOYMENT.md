@@ -46,11 +46,20 @@ The production setup includes:
 
 ## Database Management
 
+### Host Database Storage
+
+The database is stored on the host filesystem at `./data/memes.db` and bind-mounted into the container. This provides:
+
+- **Direct access** from host system using any SQLite tool
+- **Persistent storage** that survives container restarts
+- **Easy backup** using standard file system tools
+- **No volume management** complexity
+
 ### Automatic Initialization
 
 The database is automatically initialized when the application starts. The Docker container will:
 
-1. Check if the database exists at `/app/data/memes.db`
+1. Check if the database exists at `/app/data/memes.db` (maps to `./data/memes.db` on host)
 1. If not found, create the database with the required schema
 1. Enable WAL mode for better concurrency
 1. Set up foreign key constraints
@@ -75,14 +84,53 @@ sqlite3 /app/data/memes.db ".tables"
 
 ### Database Backup
 
-The database is stored in the `app-data` Docker volume. To backup:
+The database is stored on the host filesystem in the `./data` directory. To backup:
 
 ```bash
-# Create backup
-docker run --rm -v memes-ranker_app-data:/data -v $(pwd):/backup alpine tar czf /backup/db-backup-$(date +%Y%m%d).tar.gz /data
+# Create backup (simple file copy)
+cp data/memes.db backups/memes-backup-$(date +%Y%m%d).db
+
+# Or create compressed backup
+tar czf db-backup-$(date +%Y%m%d).tar.gz data/
 
 # Restore backup
-docker run --rm -v memes-ranker_app-data:/data -v $(pwd):/backup alpine tar xzf /backup/db-backup-YYYYMMDD.tar.gz -C /
+cp backups/memes-backup-YYYYMMDD.db data/memes.db
+```
+
+### Direct Database Access
+
+Since the database is now stored on the host, you can access it directly:
+
+```bash
+# Direct SQLite access
+sqlite3 data/memes.db
+
+# View tables
+sqlite3 data/memes.db ".tables"
+
+# Query data
+sqlite3 data/memes.db "SELECT * FROM sessions;"
+
+# Use any SQLite GUI tool
+# - DB Browser for SQLite
+# - TablePlus
+# - DBeaver
+# - SQLite Studio
+```
+
+### Migration from Docker Volumes
+
+If you're upgrading from a previous version that used Docker volumes:
+
+```bash
+# Stop the application
+docker-compose down
+
+# Copy data from old volume to host
+docker run --rm -v memes-ranker_app-data:/olddata -v $(pwd):/host alpine cp -r /olddata /host/data
+
+# Start with new configuration
+docker-compose up -d
 ```
 
 ## Configuration
