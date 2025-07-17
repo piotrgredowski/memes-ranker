@@ -17,11 +17,11 @@ RUN pip install --no-cache-dir uv
 WORKDIR /app
 
 # Copy dependency files
-COPY pyproject.toml ./
+COPY requirements.txt ./
 
 # Create virtual environment and install dependencies
 RUN uv venv .venv && \
-    uv pip install --no-cache -r pyproject.toml
+    uv pip install --no-cache -r requirements.txt
 
 # Copy application code
 COPY . .

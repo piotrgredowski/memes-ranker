@@ -23,6 +23,12 @@ repos:
     types_or: [ python, pyi ]
 - repo: local
   hooks:
+  - id: uv-export-requirements
+    name: export requirements.txt
+    entry: uv export --format requirements-txt --output-file requirements.txt
+    language: system
+    files: ^(pyproject\.toml|uv\.lock)$
+    pass_filenames: false
   - id: pytest
     name: run tests
     entry: uv run python -m pytest
