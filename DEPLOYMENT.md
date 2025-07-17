@@ -26,6 +26,14 @@ The production setup includes:
    # Edit .env with your production settings
    ```
 
+1. **Prepare host directories:**
+
+   ```bash
+   # Create directories for database and logs
+   mkdir -p data logs
+   chmod 755 data logs
+   ```
+
 1. **Build and start the application:**
 
    ```bash
@@ -41,8 +49,8 @@ The production setup includes:
 
 1. **Access the application:**
 
-   - Main app: http://localhost
-   - Admin dashboard: http://localhost/admin
+   - Main app: http://localhost:8081
+   - Admin dashboard: http://localhost:8081/admin
 
 ## Database Management
 

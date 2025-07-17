@@ -3,10 +3,16 @@ set -e
 
 echo "Starting memes-ranker production deployment..."
 
-# Initialize database if needed
-echo "Checking database initialization..."
-python /app/init_db_prod.py
+# Ensure data directory exists and has proper permissions
+echo "Setting up data directory..."
+mkdir -p /app/data /app/logs
+chown -R appuser:appuser /app/data /app/logs
+chmod 755 /app/data /app/logs
 
-# Start the application
+# Initialize database if needed as appuser
+echo "Checking database initialization..."
+su appuser -c "python /app/init_db_prod.py"
+
+# Start the application as appuser
 echo "Starting application with Gunicorn..."
-exec /app/.venv/bin/python -m gunicorn app.main:app -c gunicorn.conf.py
+exec su appuser -c "/app/.venv/bin/python -m gunicorn app.main:app -c gunicorn.conf.py"

@@ -51,8 +51,8 @@ RUN chmod +x /app/docker-entrypoint.sh
 RUN mkdir -p data logs static/memes static/js static/css templates && \
     chown -R appuser:appuser /app
 
-# Switch to non-root user
-USER appuser
+# Don't switch to non-root user yet - entrypoint script will handle it
+# USER appuser
 
 # Expose port
 EXPOSE 8000

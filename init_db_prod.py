@@ -14,7 +14,12 @@ def init_database_if_needed(db_path: str = "/app/data/memes.db"):
     """Initialize database if it doesn't exist."""
     # Create data directory if it doesn't exist
     db_dir = Path(db_path).parent
-    db_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        db_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Database directory created/verified at: {db_dir}")
+    except PermissionError as e:
+        print(f"Permission error creating directory {db_dir}: {e}")
+        raise
 
     # Check if database already exists
     if os.path.exists(db_path):
@@ -29,8 +34,19 @@ def init_database_if_needed(db_path: str = "/app/data/memes.db"):
     with open(schema_path, "r") as f:
         schema_sql = f.read()
 
-    # Create database connection
-    conn = sqlite3.connect(db_path)
+    # Test if we can create the database file
+    try:
+        # Create database connection
+        conn = sqlite3.connect(db_path)
+    except sqlite3.OperationalError as e:
+        print(f"Cannot create database at {db_path}: {e}")
+        print(f"Directory exists: {db_dir.exists()}")
+        print(
+            f"Directory permissions: {oct(os.stat(db_dir).st_mode)[-3:] if db_dir.exists() else 'N/A'}"
+        )
+        print(f"Current user: {os.getuid()}")
+        print(f"Current group: {os.getgid()}")
+        raise
 
     try:
         # Enable WAL mode for better concurrency
