@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Past Results - Memes Ranker{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="mb-8 text-center">
+        <h1 class="text-4xl font-bold text-gray-900 mb-2">📊 Past Results</h1>
+        <p class="text-xl text-gray-600">Browse through previous meme ranking sessions</p>
+    </div>
+
+    <!-- Search and Filter -->
+    <div class="card mb-8">
+        <div class="card-content">
+            <div class="flex flex-col sm:flex-row gap-4 items-center">
+                <div class="flex-1">
+                    <input type="text" id="search-input" placeholder="Search sessions..."
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div class="flex gap-2">
+                    <select id="sort-select" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="date-desc">Newest First</option>
+                        <option value="date-asc">Oldest First</option>
+                        <option value="name-asc">Name A-Z</option>
+                        <option value="name-desc">Name Z-A</option>
+                        <option value="participants-desc">Most Participants</option>
+                    </select>
+                    <button id="clear-filters" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg">
+                        Clear
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="mb-8 text-center">
+        <div class="flex justify-center gap-4">
+            <a href="/" class="btn bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg">
+                Rate Memes
+            </a>
+            <a href="/admin" class="btn bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg">
+                Admin Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Results Grid -->
+    {% if sessions %}
+        <div id="sessions-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for session in sessions %}
+                <div class="session-card card hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+                     onclick="window.location.href='/results/{{ session.id }}'"
+                     data-name="{{ session.name.lower() }}"
+                     data-date="{{ session.end_time or session.created_at }}"
+                     data-participants="{{ session.participant_count }}">
+
+                    <div class="card-header">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1 min-w-0">
+                                <h3 class="text-lg font-semibold text-gray-900 truncate">{{ session.name }}</h3>
+                                <p class="text-sm text-gray-500 mt-1">
+                                    {% if session.end_time %}
+                                        Completed {{ session.end_time.split(' ')[0] }}
+                                    {% else %}
+                                        Created {{ session.created_at.split(' ')[0] }}
+                                    {% endif %}
+                                </p>
+                            </div>
+
+                            <!-- Status Badge -->
+                            {% if session.is_complete %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    Complete
+                                </span>
+                            {% elif session.current_position > 0 %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                    In Progress
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                    Not Started
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="card-content">
+                        <!-- Statistics -->
+                        <div class="grid grid-cols-3 gap-4 mb-4">
+                            <div class="text-center">
+                                <div class="text-xl font-bold text-blue-600">{{ session.participant_count or 0 }}</div>
+                                <div class="text-xs text-gray-500">Participants</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-xl font-bold text-purple-600">{{ session.total_votes or 0 }}</div>
+                                <div class="text-xs text-gray-500">Total Votes</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-xl font-bold text-green-600">{{ session.memes_rated or 0 }}</div>
+                                <div class="text-xs text-gray-500">Memes</div>
+                            </div>
+                        </div>
+
+                        <!-- Reveal Progress -->
+                        {% if session.current_position > 0 %}
+                            <div class="mb-4">
+                                <div class="flex justify-between text-sm text-gray-600 mb-1">
+                                    <span>Results Revealed</span>
+                                    <span>{{ session.current_position }}/{{ session.memes_rated or 0 }}</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-300"
+                                         style="width: {{ (session.current_position / session.memes_rated * 100) if session.memes_rated else 0 }}%"></div>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        <!-- Action Button -->
+                        <div class="text-center">
+                            {% if session.current_position > 0 %}
+                                <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-100 text-blue-800">
+                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                    </svg>
+                                    View Results
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-600">
+                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                    </svg>
+                                    No Results Yet
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <!-- Empty State -->
+        <div class="card text-center">
+            <div class="card-content py-16">
+                <div class="text-6xl mb-6">📝</div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-4">No Past Results</h3>
+                <p class="text-gray-600 mb-8">No completed sessions found. Create a new session to get started!</p>
+                <div class="flex justify-center gap-4">
+                    <a href="/" class="btn bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg">
+                        Rate Memes
+                    </a>
+                    <a href="/admin" class="btn bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg">
+                        Admin Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- No Results Message (Hidden by default) -->
+    <div id="no-results" class="card text-center hidden">
+        <div class="card-content py-12">
+            <div class="text-4xl mb-4">🔍</div>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">No Results Found</h3>
+            <p class="text-gray-600 mb-6">Try adjusting your search or filters.</p>
+            <button onclick="clearFilters()" class="btn bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg">
+                Clear Filters
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden data for JavaScript -->
+<script>
+    const sessions = {{ sessions|tojson }};
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/past-results.js"></script>
+{% endblock %}

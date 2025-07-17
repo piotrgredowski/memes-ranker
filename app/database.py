@@ -509,6 +509,252 @@ class Database:
                 "unique_users_count": unique_users_count,
             }
 
+    # Results reveal operations
+    async def get_session_results(self, session_id: int) -> List[Dict[str, Any]]:
+        """Get ranked results for a session with detailed statistics.
+
+        Args:
+            session_id: Session ID
+
+        Returns:
+            List of meme results ordered by average score (descending)
+        """
+        async with self.get_connection() as conn:
+            cursor = await conn.execute(
+                """SELECT
+                    m.id,
+                    m.filename,
+                    m.path,
+                    COUNT(r.id) as vote_count,
+                    AVG(r.score) as average_score,
+                    MIN(r.score) as min_score,
+                    MAX(r.score) as max_score,
+                    CAST(SUBSTR(
+                        GROUP_CONCAT(r.score ORDER BY r.score),
+                        INSTR(GROUP_CONCAT(r.score ORDER BY r.score), ',') *
+                        (COUNT(r.id) + 1) / 2 + 1,
+                        INSTR(GROUP_CONCAT(r.score ORDER BY r.score), ',') - 1
+                    ) AS REAL) as median_score
+                FROM memes m
+                LEFT JOIN rankings r ON m.id = r.meme_id
+                JOIN sessions s ON s.id = ?
+                WHERE m.active = TRUE
+                AND (s.start_time IS NULL OR r.created_at >= s.start_time)
+                GROUP BY m.id
+                HAVING COUNT(r.id) > 0
+                ORDER BY average_score DESC""",
+                (session_id,),
+            )
+            rows = await cursor.fetchall()
+            results = []
+            for i, row in enumerate(rows):
+                result = dict(row)
+                result["position"] = len(rows) - i  # Position from last to first
+                result["ranking"] = i + 1  # Ranking from 1st to last
+                results.append(result)
+            return results
+
+    async def create_results_reveal(self, session_id: int) -> int:
+        """Initialize results reveal for a session.
+
+        Args:
+            session_id: Session ID
+
+        Returns:
+            Results reveal ID
+        """
+        async with self.get_connection() as conn:
+            cursor = await conn.execute(
+                """INSERT INTO results_reveal (session_id, current_position, is_complete)
+                   VALUES (?, 0, FALSE)
+                   ON CONFLICT(session_id) DO UPDATE SET
+                   current_position = 0,
+                   is_complete = FALSE,
+                   updated_at = CURRENT_TIMESTAMP""",
+                (session_id,),
+            )
+            await conn.commit()
+            return cursor.lastrowid
+
+    async def update_reveal_position(self, session_id: int, position: int):
+        """Update current reveal position.
+
+        Args:
+            session_id: Session ID
+            position: New position
+        """
+        async with self.get_connection() as conn:
+            await conn.execute(
+                """UPDATE results_reveal
+                   SET current_position = ?, updated_at = CURRENT_TIMESTAMP
+                   WHERE session_id = ?""",
+                (position, session_id),
+            )
+            await conn.commit()
+
+    async def get_reveal_status(self, session_id: int) -> Dict[str, Any]:
+        """Get current reveal status.
+
+        Args:
+            session_id: Session ID
+
+        Returns:
+            Reveal status dictionary
+        """
+        async with self.get_connection() as conn:
+            cursor = await conn.execute(
+                """SELECT * FROM results_reveal WHERE session_id = ?""",
+                (session_id,),
+            )
+            row = await cursor.fetchone()
+            if row:
+                return dict(row)
+            return {
+                "session_id": session_id,
+                "current_position": 0,
+                "is_complete": False,
+            }
+
+    async def get_meme_detailed_stats(
+        self, meme_id: int, session_id: int
+    ) -> Dict[str, Any]:
+        """Get detailed statistics for a meme in a session.
+
+        Args:
+            meme_id: Meme ID
+            session_id: Session ID
+
+        Returns:
+            Detailed meme statistics
+        """
+        async with self.get_connection() as conn:
+            cursor = await conn.execute(
+                """SELECT
+                    m.id,
+                    m.filename,
+                    m.path,
+                    COUNT(r.id) as vote_count,
+                    AVG(r.score) as average_score,
+                    MIN(r.score) as min_score,
+                    MAX(r.score) as max_score,
+                    GROUP_CONCAT(r.score ORDER BY r.score) as all_scores
+                FROM memes m
+                LEFT JOIN rankings r ON m.id = r.meme_id
+                JOIN sessions s ON s.id = ?
+                WHERE m.id = ? AND m.active = TRUE
+                AND (s.start_time IS NULL OR r.created_at >= s.start_time)
+                GROUP BY m.id""",
+                (session_id, meme_id),
+            )
+            row = await cursor.fetchone()
+            if row:
+                result = dict(row)
+                # Calculate median and standard deviation
+                if result["all_scores"]:
+                    scores = [int(x) for x in result["all_scores"].split(",")]
+                    scores.sort()
+                    n = len(scores)
+                    if n % 2 == 0:
+                        result["median_score"] = (
+                            scores[n // 2 - 1] + scores[n // 2]
+                        ) / 2
+                    else:
+                        result["median_score"] = scores[n // 2]
+
+                    # Calculate standard deviation
+                    if n > 1:
+                        mean = result["average_score"]
+                        variance = sum((x - mean) ** 2 for x in scores) / (n - 1)
+                        result["std_deviation"] = variance**0.5
+                    else:
+                        result["std_deviation"] = 0
+                else:
+                    result["median_score"] = 0
+                    result["std_deviation"] = 0
+
+                return result
+            return {}
+
+    async def get_completed_sessions_with_results(self) -> List[Dict[str, Any]]:
+        """Get all completed sessions that have results.
+
+        Returns:
+            List of completed sessions with metadata
+        """
+        async with self.get_connection() as conn:
+            cursor = await conn.execute(
+                """SELECT
+                    s.id,
+                    s.name,
+                    s.start_time,
+                    s.end_time,
+                    s.created_at,
+                    COUNT(DISTINCT r.user_id) as participant_count,
+                    COUNT(r.id) as total_votes,
+                    COUNT(DISTINCT r.meme_id) as memes_rated,
+                    rr.current_position,
+                    rr.is_complete
+                FROM sessions s
+                LEFT JOIN rankings r ON s.id = r.session_id
+                LEFT JOIN results_reveal rr ON s.id = rr.session_id
+                WHERE s.active = FALSE AND s.end_time IS NOT NULL
+                AND EXISTS (
+                    SELECT 1 FROM rankings r2
+                    WHERE r2.created_at >= s.start_time
+                )
+                GROUP BY s.id
+                ORDER BY s.end_time DESC""",
+            )
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    async def get_session_summary(self, session_id: int) -> Dict[str, Any]:
+        """Get session summary for past results listing.
+
+        Args:
+            session_id: Session ID
+
+        Returns:
+            Session summary dictionary
+        """
+        async with self.get_connection() as conn:
+            cursor = await conn.execute(
+                """SELECT
+                    s.id,
+                    s.name,
+                    s.start_time,
+                    s.end_time,
+                    s.created_at,
+                    COUNT(DISTINCT r.user_id) as participant_count,
+                    COUNT(r.id) as total_votes,
+                    COUNT(DISTINCT r.meme_id) as memes_rated
+                FROM sessions s
+                LEFT JOIN rankings r ON s.id = r.session_id
+                WHERE s.id = ?
+                AND (s.start_time IS NULL OR r.created_at >= s.start_time)
+                GROUP BY s.id""",
+                (session_id,),
+            )
+            row = await cursor.fetchone()
+            if row:
+                return dict(row)
+            return {}
+
+    async def complete_reveal(self, session_id: int):
+        """Mark reveal as complete.
+
+        Args:
+            session_id: Session ID
+        """
+        async with self.get_connection() as conn:
+            await conn.execute(
+                """UPDATE results_reveal
+                   SET is_complete = TRUE, updated_at = CURRENT_TIMESTAMP
+                   WHERE session_id = ?""",
+                (session_id,),
+            )
+            await conn.commit()
+
 
 # Global database instance
 db = Database()

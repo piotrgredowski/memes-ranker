@@ -351,6 +351,262 @@ async def populate_memes(admin: dict = Depends(get_current_admin)):
     return {"status": "success", "memes_added": len(meme_files)}
 
 
+# Results reveal endpoints
+@app.post("/admin/results/start/{session_id}")
+async def start_results_reveal(
+    session_id: int, admin: dict = Depends(get_current_admin)
+):
+    """Start results reveal for a session."""
+    try:
+        # Check if session exists and is finished
+        session_cursor = await db.get_connection()
+        async with session_cursor as conn:
+            cursor = await conn.execute(
+                "SELECT * FROM sessions WHERE id = ?", (session_id,)
+            )
+            session = await cursor.fetchone()
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        session_dict = dict(session)
+        if session_dict.get("active", False):
+            raise HTTPException(
+                status_code=400, detail="Cannot reveal results for active session"
+            )
+
+        # Initialize results reveal
+        await db.create_results_reveal(session_id)
+
+        return {"status": "success", "message": "Results reveal started"}
+    except Exception as e:
+        logger = get_logger(__name__)
+        logger.error(f"Error starting results reveal: {e}")
+        raise HTTPException(status_code=500, detail="Failed to start results reveal")
+
+
+@app.get("/admin/results/{session_id}")
+async def admin_results_page(
+    session_id: int, request: Request, admin: dict = Depends(get_current_admin)
+):
+    """Admin results reveal interface."""
+    try:
+        # Get session and results
+        session_cursor = await db.get_connection()
+        async with session_cursor as conn:
+            cursor = await conn.execute(
+                "SELECT * FROM sessions WHERE id = ?", (session_id,)
+            )
+            session = await cursor.fetchone()
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        results = await db.get_session_results(session_id)
+        reveal_status = await db.get_reveal_status(session_id)
+
+        return templates.TemplateResponse(
+            "admin_results.html",
+            {
+                "request": request,
+                "session": dict(session),
+                "results": results,
+                "reveal_status": reveal_status,
+                "total_positions": len(results),
+            },
+        )
+    except Exception as e:
+        logger = get_logger(__name__)
+        logger.error(f"Error loading admin results page: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load results page")
+
+
+@app.post("/admin/results/{session_id}/next")
+async def reveal_next_position(
+    session_id: int, admin: dict = Depends(get_current_admin)
+):
+    """Reveal next position in results."""
+    try:
+        results = await db.get_session_results(session_id)
+        reveal_status = await db.get_reveal_status(session_id)
+
+        current_position = reveal_status.get("current_position", 0)
+        max_position = len(results)
+
+        if current_position >= max_position:
+            raise HTTPException(
+                status_code=400, detail="All positions already revealed"
+            )
+
+        new_position = current_position + 1
+        await db.update_reveal_position(session_id, new_position)
+
+        # Mark as complete if we've revealed all positions
+        if new_position >= max_position:
+            await db.complete_reveal(session_id)
+
+        # Get the meme for this position
+        meme_data = None
+        for result in results:
+            if result["position"] == new_position:
+                meme_data = await db.get_meme_detailed_stats(result["id"], session_id)
+                break
+
+        # Broadcast to WebSocket clients
+        try:
+            await websocket_manager.broadcast_reveal_update(
+                session_id, new_position, meme_data
+            )
+        except Exception as e:
+            logger = get_logger(__name__)
+            logger.error(f"Error broadcasting reveal update: {e}")
+
+        return {
+            "position": new_position,
+            "is_complete": new_position >= max_position,
+            "meme_data": meme_data,
+        }
+    except Exception as e:
+        logger = get_logger(__name__)
+        logger.error(f"Error revealing next position: {e}")
+        raise HTTPException(status_code=500, detail="Failed to reveal next position")
+
+
+@app.post("/admin/results/{session_id}/previous")
+async def reveal_previous_position(
+    session_id: int, admin: dict = Depends(get_current_admin)
+):
+    """Go back to previous position."""
+    try:
+        reveal_status = await db.get_reveal_status(session_id)
+        current_position = reveal_status.get("current_position", 0)
+
+        if current_position <= 0:
+            raise HTTPException(status_code=400, detail="Already at first position")
+
+        new_position = current_position - 1
+        await db.update_reveal_position(session_id, new_position)
+
+        return {"position": new_position}
+    except Exception as e:
+        logger = get_logger(__name__)
+        logger.error(f"Error going to previous position: {e}")
+        raise HTTPException(status_code=500, detail="Failed to go to previous position")
+
+
+@app.post("/admin/results/{session_id}/reset")
+async def reset_results_reveal(
+    session_id: int, admin: dict = Depends(get_current_admin)
+):
+    """Reset results reveal to beginning."""
+    try:
+        await db.update_reveal_position(session_id, 0)
+        return {"status": "success", "message": "Results reveal reset"}
+    except Exception as e:
+        logger = get_logger(__name__)
+        logger.error(f"Error resetting results reveal: {e}")
+        raise HTTPException(status_code=500, detail="Failed to reset results reveal")
+
+
+# Public results endpoints
+@app.get("/results/{session_id}")
+async def public_results_view(session_id: int, request: Request):
+    """Public/User view of revealed results - accessible to all users."""
+    try:
+        # Get session and results
+        session_cursor = await db.get_connection()
+        async with session_cursor as conn:
+            cursor = await conn.execute(
+                "SELECT * FROM sessions WHERE id = ?", (session_id,)
+            )
+            session = await cursor.fetchone()
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        results = await db.get_session_results(session_id)
+        reveal_status = await db.get_reveal_status(session_id)
+
+        # Get user's rankings for this session if they have a session token
+        user_rankings = []
+        session_token = request.cookies.get("session_token")
+        if session_token:
+            try:
+                user = await db.get_user_by_token(session_token)
+                if user:
+                    user_rankings = await db.get_user_rankings_for_session(
+                        user["id"], session_id
+                    )
+            except Exception:
+                pass  # Ignore errors getting user rankings
+
+        return templates.TemplateResponse(
+            "public_results.html",
+            {
+                "request": request,
+                "session": dict(session),
+                "results": results,
+                "reveal_status": reveal_status,
+                "user_rankings": user_rankings,
+                "total_positions": len(results),
+            },
+        )
+    except Exception as e:
+        logger = get_logger(__name__)
+        logger.error(f"Error loading public results page: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load results page")
+
+
+@app.get("/past-results")
+async def past_results_page(request: Request):
+    """Past results archive page - list all completed sessions."""
+    try:
+        completed_sessions = await db.get_completed_sessions_with_results()
+
+        return templates.TemplateResponse(
+            "past_results.html",
+            {
+                "request": request,
+                "sessions": completed_sessions,
+            },
+        )
+    except Exception as e:
+        logger = get_logger(__name__)
+        logger.error(f"Error loading past results page: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load past results page")
+
+
+@app.get("/api/past-results")
+async def get_past_results_api():
+    """API endpoint for past results data."""
+    try:
+        completed_sessions = await db.get_completed_sessions_with_results()
+        return {"sessions": completed_sessions}
+    except Exception as e:
+        logger = get_logger(__name__)
+        logger.error(f"Error getting past results: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get past results")
+
+
+@app.get("/api/results/{session_id}/status")
+async def get_reveal_status_api(session_id: int):
+    """Get current reveal status (for WebSocket updates)."""
+    try:
+        reveal_status = await db.get_reveal_status(session_id)
+        results = await db.get_session_results(session_id)
+
+        return {
+            "session_id": session_id,
+            "current_position": reveal_status.get("current_position", 0),
+            "is_complete": reveal_status.get("is_complete", False),
+            "total_positions": len(results),
+        }
+    except Exception as e:
+        logger = get_logger(__name__)
+        logger.error(f"Error getting reveal status: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get reveal status")
+
+
 @app.get("/qr-code")
 async def get_qr_code():
     """Generate QR code image."""

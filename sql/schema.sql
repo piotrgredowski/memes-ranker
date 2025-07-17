@@ -45,6 +45,17 @@ CREATE TABLE sessions (
     ,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+-- Results reveal table
+CREATE TABLE results_reveal (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    current_position INTEGER DEFAULT 0,
+    is_complete BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES sessions(id)
+    );
+
 -- Indexes for better performance
 CREATE INDEX idx_users_session_token ON users (session_token);
 
@@ -55,3 +66,7 @@ CREATE INDEX idx_rankings_meme_id ON rankings (meme_id);
 CREATE INDEX idx_memes_active ON memes (active);
 
 CREATE INDEX idx_sessions_active ON sessions (active);
+
+CREATE INDEX idx_results_reveal_session ON results_reveal (session_id);
+
+CREATE UNIQUE INDEX idx_results_reveal_unique_session ON results_reveal (session_id);

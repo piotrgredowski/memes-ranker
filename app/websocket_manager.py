@@ -129,6 +129,24 @@ class WebSocketManager:
         await self.broadcast_to_group("admin", message)
         await self.broadcast_to_group("users", message)
 
+    async def broadcast_reveal_update(
+        self, session_id: int, position: int, meme_data: dict
+    ):
+        """Broadcast results reveal update to all connected clients."""
+        message = json.dumps(
+            {
+                "type": "reveal_update",
+                "session_id": session_id,
+                "position": position,
+                "meme_data": meme_data,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
+
+        # Broadcast to both admin and users
+        await self.broadcast_to_group("admin", message)
+        await self.broadcast_to_group("users", message)
+
     def get_connection_stats(self) -> dict:
         """Get current connection statistics."""
         return {
