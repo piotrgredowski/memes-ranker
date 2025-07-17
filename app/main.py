@@ -162,6 +162,24 @@ async def index(request: Request):
         response.delete_cookie("session_token")
         return response
 
+    # Check if there's an active session
+    active_session = await db.get_active_session()
+
+    # If no active session, show waiting screen
+    if not active_session:
+        return templates.TemplateResponse(
+            "index.html",
+            {
+                "request": request,
+                "user_name": user["name"],
+                "memes": [],
+                "current_meme": None,
+                "user_rankings": [],
+                "active_session": None,
+                "qr_code_url": os.getenv("QR_CODE_URL", "https://memes.bieda.it"),
+            },
+        )
+
     # Get active memes
     memes = await db.get_active_memes()
 
@@ -184,6 +202,7 @@ async def index(request: Request):
             "memes": memes,
             "current_meme": current_meme,
             "user_rankings": user_rankings,
+            "active_session": active_session,
             "qr_code_url": os.getenv("QR_CODE_URL", "https://memes.bieda.it"),
         },
     )
@@ -199,6 +218,14 @@ async def rank_meme(request: Request, ranking: RankingRequest):
     user = await db.get_user_by_token(session_token)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid session token")
+
+    # Check if there's an active session
+    active_session = await db.get_active_session()
+    if not active_session:
+        raise HTTPException(
+            status_code=403,
+            detail="No active session. Please wait for an admin to start a session.",
+        )
 
     # Validate score
     if not (0 <= ranking.score <= 10):
@@ -247,6 +274,11 @@ async def admin_dashboard(request: Request, admin: dict = Depends(get_current_ad
     meme_stats = await db.get_meme_stats()
     active_session = await db.get_active_session()
 
+    # Get session statistics if there's an active session
+    session_stats = None
+    if active_session:
+        session_stats = await db.get_session_stats(active_session["id"])
+
     return templates.TemplateResponse(
         "admin.html",
         {
@@ -254,6 +286,7 @@ async def admin_dashboard(request: Request, admin: dict = Depends(get_current_ad
             "is_dashboard": True,
             "meme_stats": meme_stats,
             "active_session": active_session,
+            "session_stats": session_stats,
             "qr_code_url": os.getenv("QR_CODE_URL", "https://memes.bieda.it"),
         },
     )
@@ -329,6 +362,45 @@ async def get_stats():
     """API endpoint to get meme statistics."""
     stats = await db.get_meme_stats()
     return {"stats": stats}
+
+
+@app.get("/api/session/stats")
+async def get_session_stats(admin: dict = Depends(get_current_admin)):
+    """API endpoint to get session statistics with real-time data."""
+    active_session = await db.get_active_session()
+
+    if not active_session:
+        return {"error": "No active session"}
+
+    # Get session stats from database
+    session_stats = await db.get_session_stats(active_session["id"])
+
+    # Get real-time connection stats from WebSocket manager
+    connection_stats = websocket_manager.get_connection_stats()
+
+    # Calculate expected votes (connected users × memes)
+    expected_votes = connection_stats["user_connections"] * session_stats.get(
+        "meme_count", 0
+    )
+
+    return {
+        "session": session_stats.get("session", {}),
+        "connected_users": connection_stats["user_connections"],
+        "total_votes": session_stats.get("vote_count", 0),
+        "meme_count": session_stats.get("meme_count", 0),
+        "expected_votes": expected_votes,
+        "connection_stats": connection_stats,
+    }
+
+
+@app.get("/api/session/status")
+async def get_session_status():
+    """Public API endpoint to check if there's an active session."""
+    active_session = await db.get_active_session()
+    return {
+        "has_active_session": active_session is not None,
+        "session_name": active_session["name"] if active_session else None,
+    }
 
 
 # Initialize memes on startup

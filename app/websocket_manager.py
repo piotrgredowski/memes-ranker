@@ -51,6 +51,9 @@ class WebSocketManager:
                     },
                 },
             )
+
+            # Broadcast updated connection stats to admins
+            await self.broadcast_connection_stats()
         else:
             logger.warning(f"Unknown client type: {client_type}")
             await websocket.close(code=1000)
@@ -69,6 +72,9 @@ class WebSocketManager:
         client_id = info.get("id", "unknown")
 
         logger.info(f"WebSocket disconnected: {client_type} client ({client_id})")
+
+        # Broadcast updated connection stats to admins
+        await self.broadcast_connection_stats()
 
     async def send_personal_message(self, websocket: WebSocket, message: dict):
         """Send message to a specific WebSocket connection."""
@@ -132,6 +138,42 @@ class WebSocketManager:
             "user_connections": len(self.connections["users"]),
             "groups": list(self.connections.keys()),
         }
+
+    async def broadcast_connection_stats(self):
+        """Broadcast current connection stats to admin clients."""
+        from .database import db
+
+        # Get connection stats
+        stats = self.get_connection_stats()
+
+        # Get vote stats from database
+        try:
+            # Get total vote count
+            total_votes = await db.get_total_vote_count()
+
+            # Get meme count for expected votes calculation
+            meme_stats = await db.get_meme_stats()
+            meme_count = len(meme_stats) if meme_stats else 0
+
+            # Calculate expected votes (users × memes)
+            expected_votes = stats["user_connections"] * meme_count
+
+            # Combine stats
+            combined_stats = {
+                **stats,
+                "total_votes": total_votes,
+                "meme_count": meme_count,
+                "expected_votes": expected_votes,
+                "timestamp": datetime.now().isoformat(),
+            }
+
+            message = json.dumps({"type": "connection_stats", "data": combined_stats})
+
+            # Only broadcast to admin connections
+            await self.broadcast_to_group("admin", message)
+
+        except Exception as e:
+            logger.error(f"Error broadcasting connection stats: {e}")
 
     async def ping_all_connections(self):
         """Send ping to all connections to check health."""

@@ -5,7 +5,101 @@
 {% block content %}
 <div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8">
     <div class="max-w-2xl mx-auto px-4">
-        {% if current_meme %}
+        {% if active_session is none %}
+        <!-- No Active Session Screen -->
+        <div class="text-center">
+            <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+                <!-- Header -->
+                <div class="bg-gradient-to-r from-orange-500 to-pink-500 text-white p-8">
+                    <div class="text-6xl mb-4">⏳</div>
+                    <h2 class="text-3xl font-bold mb-2">Session Not Started</h2>
+                    <p class="text-orange-100 text-lg">
+                        Please wait for an admin to start a meme ranking session
+                    </p>
+                    <div class="mt-4 inline-flex items-center gap-2 bg-white bg-opacity-20 rounded-full px-4 py-2">
+                        <div class="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                        <span class="font-semibold">Waiting for session...</span>
+                    </div>
+                </div>
+
+                <!-- Content -->
+                <div class="p-8">
+                    <div class="max-w-md mx-auto">
+                        <!-- Welcome Message -->
+                        <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-6 border border-blue-200">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                    </svg>
+                                </div>
+                                <div class="text-left">
+                                    <h3 class="font-semibold text-blue-900">Welcome, {{ user_name }}!</h3>
+                                    <p class="text-sm text-blue-600">You're ready to start rating memes</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Instructions -->
+                        <div class="space-y-4 text-left">
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                    <span class="text-green-600 font-bold text-sm">1</span>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-1">Wait for Session Start</h4>
+                                    <p class="text-gray-600 text-sm">An admin will start a new ranking session when ready</p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                    <span class="text-blue-600 font-bold text-sm">2</span>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-1">Rate Memes</h4>
+                                    <p class="text-gray-600 text-sm">You'll see memes one by one to rate from 0-10</p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                    <span class="text-purple-600 font-bold text-sm">3</span>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-gray-800 mb-1">See Results</h4>
+                                    <p class="text-gray-600 text-sm">View your ratings and see how others ranked the memes</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Real-time Status -->
+                        <div class="mt-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <span class="text-gray-700 font-medium">Status</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
+                                    <span class="text-orange-600 font-medium text-sm">Waiting</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Auto-refresh Notice -->
+                        <div class="mt-6 text-center">
+                            <p class="text-xs text-gray-500">
+                                This page will automatically update when a session starts
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% elif current_meme %}
         <!-- Current Meme Section -->
         <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
             <!-- Header -->
@@ -306,6 +400,102 @@
             submitButton.click();
         });
     }
+
+    // WebSocket for session updates (when waiting for session)
+    let userSocket = null;
+    let sessionCheckInterval = null;
+
+    // Initialize real-time session monitoring
+    function initializeSessionMonitoring() {
+        // Only initialize if we're on the waiting screen
+        if (!document.querySelector('.bg-gradient-to-r.from-orange-500')) {
+            return;
+        }
+
+        // Initialize WebSocket connection for real-time updates
+        try {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/user`;
+            userSocket = new WebSocket(wsUrl);
+
+            userSocket.onopen = function(event) {
+                console.log('User WebSocket connected');
+            };
+
+            userSocket.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log('WebSocket message received:', data.type);
+
+                    // Only reload when a session actually starts (not just created)
+                    if (data.type === 'session_started') {
+                        showMessage('Session started! Loading memes...', 'success');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    }
+                    // Ignore other message types like connection_established, ping, etc.
+                } catch (error) {
+                    console.error('Error parsing WebSocket message:', error);
+                }
+            };
+
+            userSocket.onclose = function(event) {
+                console.log('User WebSocket disconnected');
+                // Attempt to reconnect after 5 seconds
+                setTimeout(initializeSessionMonitoring, 5000);
+            };
+
+            userSocket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+        } catch (error) {
+            console.error('Error initializing WebSocket:', error);
+        }
+
+        // Check periodically via HTTP in case WebSocket fails (start after 30 seconds)
+        setTimeout(() => {
+            sessionCheckInterval = setInterval(checkSessionStatus, 30000); // Check every 30 seconds
+        }, 30000);
+    }
+
+    // Check session status via API
+    async function checkSessionStatus() {
+        try {
+            const response = await fetch('/api/session/status');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.has_active_session) {
+                    // Session exists, reload the page
+                    showMessage('Session started! Loading memes...', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                }
+                // If no active session, continue waiting without error
+            } else {
+                console.log('Session status check failed, continuing to wait...');
+            }
+        } catch (error) {
+            // Network error, keep waiting
+            console.log('Session check failed, continuing to wait...');
+        }
+    }
+
+    // Initialize when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeSessionMonitoring();
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+        if (userSocket) {
+            userSocket.close();
+        }
+        if (sessionCheckInterval) {
+            clearInterval(sessionCheckInterval);
+        }
+    });
 
     // Message display function
     function showMessage(message, type) {

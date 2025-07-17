@@ -187,15 +187,49 @@
                 </div>
             </div>
             <div class="card-content">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div class="bg-white rounded-lg p-4 border border-green-200">
-                        <p class="text-sm font-medium text-green-600 mb-1">Session Name</p>
-                        <p class="text-lg font-semibold text-green-900">{{ active_session.name }}</p>
+                <!-- Compact Session Info -->
+                <div class="bg-white rounded-lg p-4 border border-green-200 mb-4">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                        <div>
+                            <p class="text-xs text-green-600 mb-1">Session</p>
+                            <p class="text-sm font-semibold text-green-900 truncate">{{ active_session.name }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-green-600 mb-1">Started</p>
+                            <p class="text-sm font-semibold text-green-900">{{ active_session.start_time.split(' ')[1][:5] if active_session.start_time else '-' }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-green-600 mb-1">Users</p>
+                            <p class="text-sm font-semibold text-green-900" id="connected-users-count">-</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-green-600 mb-1">Memes</p>
+                            <p class="text-sm font-semibold text-green-900">{{ session_stats.meme_count if session_stats else 0 }}</p>
+                        </div>
                     </div>
-                    <div class="bg-white rounded-lg p-4 border border-green-200">
-                        <p class="text-sm font-medium text-green-600 mb-1">Started</p>
-                        <p class="text-lg font-semibold text-green-900">{{ active_session.start_time or 'Not started' }}
-                        </p>
+                </div>
+
+                <!-- Compact Statistics -->
+                <div class="grid grid-cols-3 gap-3 mb-4">
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-200 text-center">
+                        <p class="text-xs font-medium text-blue-600 mb-1">Votes</p>
+                        <p class="text-xl font-bold text-blue-900" id="session-votes-count">{{ session_stats.vote_count if session_stats else 0 }}</p>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-purple-50 to-violet-50 rounded-lg p-3 border border-purple-200 text-center">
+                        <p class="text-xs font-medium text-purple-600 mb-1">Expected</p>
+                        <p class="text-xl font-bold text-purple-900" id="expected-votes-count">-</p>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200 text-center">
+                        <p class="text-xs font-medium text-green-600 mb-1">Progress</p>
+                        <p class="text-xl font-bold text-green-900" id="session-progress">0%</p>
+                        <!-- Compact progress bar -->
+                        <div class="mt-2">
+                            <div class="w-full bg-gray-200 rounded-full h-1.5">
+                                <div id="progress-bar" class="bg-gradient-to-r from-green-400 to-emerald-500 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -495,6 +529,163 @@
             }
         });
     }
+
+    // WebSocket for real-time updates
+    let adminSocket = null;
+    let statsUpdateInterval = null;
+
+    // Initialize WebSocket connection and stats updates
+    function initializeRealTimeUpdates() {
+        // Only initialize if we're on the dashboard with an active session
+        if (!document.getElementById('connected-users-count')) {
+            return;
+        }
+
+        // Initialize WebSocket connection for real-time updates
+        try {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/admin`;
+            adminSocket = new WebSocket(wsUrl);
+
+            adminSocket.onopen = function(event) {
+                console.log('Admin WebSocket connected');
+            };
+
+            adminSocket.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'connection_stats') {
+                        updateConnectionStats(data.data);
+                    }
+                } catch (error) {
+                    console.error('Error parsing WebSocket message:', error);
+                }
+            };
+
+            adminSocket.onclose = function(event) {
+                console.log('Admin WebSocket disconnected');
+                // Attempt to reconnect after 5 seconds
+                setTimeout(initializeRealTimeUpdates, 5000);
+            };
+
+            adminSocket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+        } catch (error) {
+            console.error('Error initializing WebSocket:', error);
+        }
+
+        // Fetch session stats periodically
+        fetchSessionStats();
+        statsUpdateInterval = setInterval(fetchSessionStats, 10000); // Update every 10 seconds
+    }
+
+    // Fetch session statistics from API
+    async function fetchSessionStats() {
+        try {
+            const response = await fetch('/api/session/stats');
+            if (response.ok) {
+                const data = await response.json();
+                updateSessionStats(data);
+            } else if (response.status === 404) {
+                // No active session, clear stats
+                clearSessionStats();
+            }
+        } catch (error) {
+            console.error('Error fetching session stats:', error);
+        }
+    }
+
+    // Update connection statistics from WebSocket
+    function updateConnectionStats(stats) {
+        const connectedUsersElement = document.getElementById('connected-users-count');
+        const expectedVotesElement = document.getElementById('expected-votes-count');
+
+        if (connectedUsersElement) {
+            connectedUsersElement.textContent = stats.user_connections || 0;
+        }
+
+        if (expectedVotesElement && stats.expected_votes !== undefined) {
+            expectedVotesElement.textContent = stats.expected_votes || 0;
+        }
+
+        // Update progress if we have both current and expected votes
+        updateProgress(stats.total_votes || 0, stats.expected_votes || 0);
+    }
+
+    // Update session statistics from API
+    function updateSessionStats(data) {
+        const connectedUsersElement = document.getElementById('connected-users-count');
+        const sessionVotesElement = document.getElementById('session-votes-count');
+        const expectedVotesElement = document.getElementById('expected-votes-count');
+
+        if (connectedUsersElement) {
+            connectedUsersElement.textContent = data.connected_users || 0;
+        }
+
+        if (sessionVotesElement) {
+            sessionVotesElement.textContent = data.total_votes || 0;
+        }
+
+        if (expectedVotesElement) {
+            expectedVotesElement.textContent = data.expected_votes || 0;
+        }
+
+        updateProgress(data.total_votes || 0, data.expected_votes || 0);
+    }
+
+    // Update progress bar and percentage
+    function updateProgress(currentVotes, expectedVotes) {
+        const progressElement = document.getElementById('session-progress');
+        const progressBarElement = document.getElementById('progress-bar');
+
+        if (progressElement && progressBarElement) {
+            let percentage = 0;
+            if (expectedVotes > 0) {
+                percentage = Math.min(100, Math.round((currentVotes / expectedVotes) * 100));
+            }
+
+            progressElement.textContent = `${percentage}%`;
+            progressBarElement.style.width = `${percentage}%`;
+        }
+    }
+
+    // Clear session statistics when no active session
+    function clearSessionStats() {
+        const elements = [
+            'connected-users-count',
+            'session-votes-count',
+            'expected-votes-count',
+            'session-progress'
+        ];
+
+        elements.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = id === 'session-progress' ? '0%' : '0';
+            }
+        });
+
+        const progressBar = document.getElementById('progress-bar');
+        if (progressBar) {
+            progressBar.style.width = '0%';
+        }
+    }
+
+    // Initialize when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeRealTimeUpdates();
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+        if (adminSocket) {
+            adminSocket.close();
+        }
+        if (statsUpdateInterval) {
+            clearInterval(statsUpdateInterval);
+        }
+    });
 
     // Utility functions
     function getCookie(name) {

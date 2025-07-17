@@ -386,6 +386,82 @@ class Database:
                 except Exception as e:
                     print(f"Failed to broadcast session finished event: {e}")
 
+    async def get_total_vote_count(self) -> int:
+        """Get total number of votes/rankings submitted.
+
+        Returns:
+            Total number of rankings in the database
+        """
+        async with self.get_connection() as conn:
+            cursor = await conn.execute("SELECT COUNT(*) FROM rankings")
+            result = await cursor.fetchone()
+            return result[0] if result else 0
+
+    async def get_session_vote_count(self, session_id: int) -> int:
+        """Get number of votes submitted for a specific session.
+
+        Args:
+            session_id: Session ID to get vote count for
+
+        Returns:
+            Number of votes for the session
+        """
+        async with self.get_connection() as conn:
+            cursor = await conn.execute(
+                """SELECT COUNT(*) FROM rankings r
+                   WHERE r.created_at >= (
+                       SELECT start_time FROM sessions WHERE id = ? AND start_time IS NOT NULL
+                   )""",
+                (session_id,),
+            )
+            result = await cursor.fetchone()
+            return result[0] if result else 0
+
+    async def get_session_stats(self, session_id: int) -> dict:
+        """Get comprehensive statistics for a specific session.
+
+        Args:
+            session_id: Session ID to get stats for
+
+        Returns:
+            Dictionary containing session statistics
+        """
+        async with self.get_connection() as conn:
+            # Get session details
+            session_cursor = await conn.execute(
+                "SELECT * FROM sessions WHERE id = ?", (session_id,)
+            )
+            session_row = await session_cursor.fetchone()
+
+            if not session_row:
+                return {}
+
+            session = dict(session_row)
+
+            # Count votes submitted during this session (if it has started)
+            vote_count = 0
+            if session.get("start_time"):
+                vote_cursor = await conn.execute(
+                    """SELECT COUNT(*) FROM rankings r
+                       WHERE r.created_at >= ?""",
+                    (session["start_time"],),
+                )
+                vote_result = await vote_cursor.fetchone()
+                vote_count = vote_result[0] if vote_result else 0
+
+            # Get total number of active memes for expected votes calculation
+            meme_cursor = await conn.execute(
+                "SELECT COUNT(*) FROM memes WHERE active = TRUE"
+            )
+            meme_result = await meme_cursor.fetchone()
+            meme_count = meme_result[0] if meme_result else 0
+
+            return {
+                "session": session,
+                "vote_count": vote_count,
+                "meme_count": meme_count,
+            }
+
 
 # Global database instance
 db = Database()
