@@ -4,10 +4,13 @@ FROM ghcr.io/astral-sh/uv:debian-slim
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
-# Install system dependencies
+# Install system dependencies including Python
 RUN apt-get update && apt-get install -y \
     curl \
     build-essential \
+    python3 \
+    python3-dev \
+    python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
 
@@ -18,7 +21,9 @@ WORKDIR /app
 COPY requirements.txt ./
 
 # Create virtual environment and install dependencies
-RUN uv venv .venv && \
+# Use system Python instead of uv's managed Python
+ENV UV_PYTHON=/usr/bin/python3
+RUN uv venv .venv --python /usr/bin/python3 && \
     uv pip install --no-cache -r requirements.txt
 
 # Copy application code
