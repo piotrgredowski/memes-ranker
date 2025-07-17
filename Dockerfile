@@ -54,11 +54,9 @@ COPY --from=css-builder --chown=appuser:appuser /app/static/css/output.css ./sta
 # Make entrypoint script executable
 RUN chmod +x /app/docker-entrypoint.sh
 
-# Create necessary directories
-RUN mkdir -p data logs static/memes static/js static/css templates
-
-# Fix permissions for directories
-RUN chown -R appuser:appuser /app/data /app/logs /app/static
+# Create necessary directories with proper ownership
+RUN mkdir -p data logs static/memes static/js static/css templates && \
+    chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser
