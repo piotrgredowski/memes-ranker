@@ -16,3 +16,4 @@ Use conventional commit format described in @.vscode/settings.json file at the j
 Use this commit to commit the changes to the git repository.
 If there any issues reported by pre-commit hooks or linters, fix them first using the `fix_issues` command.
 Never use --no-verify flag with git commit command.
+g

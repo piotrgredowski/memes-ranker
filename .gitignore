@@ -208,3 +208,4 @@ data/
 
 # Logs
 logs/
+.env.prod
