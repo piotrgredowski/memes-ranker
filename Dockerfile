@@ -1,5 +1,8 @@
-# Production FastAPI application following uv Docker best practices
-FROM ghcr.io/astral-sh/uv:python3.13-debian-slim
+# Production FastAPI application using uv with Python base image
+FROM python:3.13-slim
+
+# Copy uv from the official uv image
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
