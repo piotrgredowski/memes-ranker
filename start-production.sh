@@ -18,8 +18,7 @@ uv run python -m gunicorn app.main:app -c gunicorn.conf.py &
 
 # Start nginx container with the same port
 echo "Starting nginx proxy..."
-docker run -d -p 80:80 -e APP_PORT=${APP_PORT:-8000} --name memes-nginx simple-nginx
-
+docker run -d -p 40999:80 -e APP_PORT=${APP_PORT:-8000} --name memes-nginx simple-nginx
 echo "Application started!"
 echo "App: http://localhost:${APP_PORT:-8000}"
 echo "Nginx: http://localhost:80"
