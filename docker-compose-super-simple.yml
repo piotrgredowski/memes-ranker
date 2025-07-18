@@ -13,7 +13,7 @@ services:
   nginx:
     image: nginx:alpine
     ports:
-      - "11111:80"
+      - "40999:80"
     volumes:
       - ./nginx-super-simple.conf:/etc/nginx/nginx.conf
     depends_on:
