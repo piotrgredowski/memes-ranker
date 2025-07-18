@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    environment:
+      - APP_HOST=0.0.0.0
+      - APP_PORT=5678
+    volumes:
+      - ./data:/app/data
+      - ./static/memes:/app/static/memes
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx-super-simple.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - app
